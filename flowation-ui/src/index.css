@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  /* Base palette — dark with violet accent (Vite-inspired) */
+  --color-bg-primary: #0a0a0f;
+  --color-bg-secondary: #12121a;
+  --color-bg-tertiary: #1a1a27;
+  --color-bg-elevated: #22223a;
+  --color-bg-hover: #2a2a42;
+
+  --color-border: #2e2e48;
+  --color-border-subtle: #1e1e34;
+
+  --color-text-primary: #e8e8f0;
+  --color-text-secondary: #9d9db8;
+  --color-text-muted: #6b6b88;
+
+  /* Violet accent — dark violet / lilac spectrum */
+  --color-accent: #8b5cf6;
+  --color-accent-hover: #a78bfa;
+  --color-accent-muted: #7c3aed;
+  --color-accent-subtle: rgba(139, 92, 246, 0.12);
+
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #eab308;
+  --color-info: #3b82f6;
+
+  /* Font */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* CodeMirror theme overrides */
+.cm-editor {
+  background: var(--color-bg-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+}
+.cm-editor .cm-gutters {
+  background: var(--color-bg-secondary) !important;
+  border-right: 1px solid var(--color-border) !important;
+}
+.cm-editor.cm-focused {
+  outline: 1px solid var(--color-accent) !important;
+}

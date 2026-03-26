@@ -1,0 +1,21 @@
+services:
+  mock-postgres:
+    image: postgres:16
+    container_name: mock-postgres
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: ecom_user
+      POSTGRES_PASSWORD: ecom_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - mock_postgres_data:/var/lib/postgresql/data
+      - ./mock-ecommerce/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecom_user -d ecommerce"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mock_postgres_data:

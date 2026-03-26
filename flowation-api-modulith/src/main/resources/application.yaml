@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: flowation-api-modulith
+  datasource:
+    url: jdbc:postgresql://localhost:4321/flowation-db
+    username: fw_user
+    password: fw_password
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: false
+server:
+  port: 2121

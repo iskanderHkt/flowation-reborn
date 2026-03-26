@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec:*)",
+      "Bash(npm install:*)",
+      "Bash(cd:*)",
+      "Bash(npx tsc:*)",
+      "Bash(netstat -ano)"
+    ]
+  }
+}
