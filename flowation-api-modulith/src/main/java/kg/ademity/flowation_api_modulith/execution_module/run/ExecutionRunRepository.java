@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface ExecutionRunRepository extends CrudRepository<ExecutionRun, UUID> {
     List<ExecutionRun> findAllByOperationIdOrderByCreatedAtDesc(UUID operationId);
+    List<ExecutionRun> findAllByFlowIdOrderByCreatedAtDesc(UUID flowId);
 }

@@ -19,8 +19,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/operations', label: 'Operations', icon: Zap },
-  { to: '/flows', label: 'Flows', icon: GitBranch, disabled: true },
-  { to: '/environments', label: 'Environments', icon: Globe, disabled: true },
+  { to: '/flows', label: 'Flows', icon: GitBranch },
+  { to: '/environments', label: 'Environments', icon: Globe },
   { to: '/executions', label: 'Executions', icon: Play, disabled: true },
 ]
 

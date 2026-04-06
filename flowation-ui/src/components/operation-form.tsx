@@ -53,6 +53,7 @@ interface OperationFormProps {
   onConfigChange: (config: OperationConfig) => void
   onTypeChange?: (type: OperationType) => void
   isNew?: boolean
+  hideName?: boolean
   validationErrors?: Record<string, string> | null
 }
 
@@ -63,6 +64,7 @@ export function OperationForm({
   onConfigChange,
   onTypeChange,
   isNew = false,
+  hideName = false,
   validationErrors,
 }: OperationFormProps) {
   const handleTypeSwitch = (type: OperationType) => {
@@ -72,27 +74,29 @@ export function OperationForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex gap-3 items-end">
-        <div className="flex-1">
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => onNameChange(e.target.value)}
-            placeholder="e.g. Login Request"
-          />
-          <FieldError error={validationErrors?.['name']} />
-        </div>
-        {isNew && (
-          <div className="w-44">
-            <Select
-              label="Type"
-              value={config.type}
-              options={OP_TYPES}
-              onChange={(e) => handleTypeSwitch(e.target.value as OperationType)}
+      {!hideName && (
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <Input
+              label="Name"
+              value={name}
+              onChange={(e) => onNameChange(e.target.value)}
+              placeholder="e.g. Login Request"
             />
+            <FieldError error={validationErrors?.['name']} />
           </div>
-        )}
-      </div>
+          {isNew && (
+            <div className="w-44">
+              <Select
+                label="Type"
+                value={config.type}
+                options={OP_TYPES}
+                onChange={(e) => handleTypeSwitch(e.target.value as OperationType)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {config.type === 'HTTP_REQUEST' && (
         <HttpConfigForm config={config} onChange={onConfigChange} errors={validationErrors} />

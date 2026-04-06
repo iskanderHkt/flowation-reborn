@@ -6,11 +6,13 @@ import kg.ademity.flowation_api_modulith.execution_module.executor.StepResult;
 import kg.ademity.flowation_api_modulith.execution_module.run.*;
 import kg.ademity.flowation_api_modulith.flow_module.operation.Operation;
 import kg.ademity.flowation_api_modulith.flow_module.operation.OperationService;
+import kg.ademity.flowation_api_modulith.environment_module.EnvironmentService;
 import kg.ademity.flowation_api_modulith.shared.DevContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,8 +26,9 @@ public class InstantExecutionService {
     private final ExecutionStepResultRepository stepResultRepository;
     private final List<OperationExecutor> executors;
     private final DevContext devContext;
+    private final EnvironmentService environmentService;
 
-    public ExecutionResultResponse execute(UUID operationId) {
+    public ExecutionResultResponse execute(UUID operationId, UUID environmentId) {
         Operation operation = operationService.findById(operationId);
 
         ExecutionRun run = executionRunRepository.save(ExecutionRun.builder()
@@ -33,6 +36,7 @@ public class InstantExecutionService {
                 .runMode(RunMode.INSTANT)
                 .status(ExecutionStatus.RUNNING)
                 .operationId(operationId)
+                .environmentId(environmentId)
                 .executionPlan(Map.of("operationId", operationId.toString(), "operationName", operation.getName()))
                 .startedAt(Instant.now())
                 .createdAt(Instant.now())
@@ -43,7 +47,12 @@ public class InstantExecutionService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("No executor found for type: " + operation.getType()));
 
-        StepResult stepResult = executor.execute(operation.getConfigTemplate(), Map.of());
+        Map<String, Object> context = new HashMap<>();
+        if (environmentId != null) {
+            context.putAll(environmentService.loadAsContext(environmentId));
+        }
+
+        StepResult stepResult = executor.execute(operation.getConfigTemplate(), context);
 
         Instant completedAt = Instant.now();
 

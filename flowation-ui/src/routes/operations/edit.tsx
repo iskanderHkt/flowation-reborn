@@ -6,6 +6,7 @@ import {
   useExecuteOperation,
   useExecutionHistory,
 } from '@/hooks/use-operations.ts'
+import { useEnvironments } from '@/hooks/use-environments.ts'
 import { OperationForm } from '@/components/operation-form.tsx'
 import { ExecutionPanel } from '@/components/execution-panel.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -33,6 +34,9 @@ export function OperationEditPage() {
   const executeMutation = useExecuteOperation(operationId)
   const { data: executionHistory = [], isLoading: historyLoading } =
     useExecutionHistory(operationId)
+
+  const { data: environments = [] } = useEnvironments()
+  const [selectedEnvId, setSelectedEnvId] = useState<string>('')
 
   const [name, setName] = useState('')
   const [config, setConfig] = useState<OperationConfig | null>(null)
@@ -100,7 +104,7 @@ export function OperationEditPage() {
         const saved = await updateMutation.mutateAsync({ name: name.trim(), config })
         syncFromSaved(saved)
       }
-      const result = await executeMutation.mutateAsync()
+      const result = await executeMutation.mutateAsync(selectedEnvId || undefined)
       setLastResult(result)
       if (result.status === 'FAILED') {
         toast({ title: 'Execution failed', description: result.errorMessage ?? undefined, variant: 'error' })
@@ -144,6 +148,18 @@ export function OperationEditPage() {
           <span className="text-xs text-[var(--color-warning)]">unsaved</span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {environments.length > 0 && (
+            <select
+              value={selectedEnvId}
+              onChange={(e) => setSelectedEnvId(e.target.value)}
+              className="h-7 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 text-xs text-[var(--color-text-secondary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] cursor-pointer"
+            >
+              <option value="">No environment</option>
+              {environments.map((env) => (
+                <option key={env.id} value={env.id}>{env.name}</option>
+              ))}
+            </select>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -180,7 +196,7 @@ export function OperationEditPage() {
       </div>
 
       {/* Resize handle + Execution panel */}
-      <ResizeHandle panelHeight={panelHeight} onResize={onResize} />
+      <ResizeHandle size={panelHeight} onResize={onResize} />
       <div className="shrink-0 overflow-hidden" style={{ height: panelHeight }}>
         <ExecutionPanel
           result={lastResult}

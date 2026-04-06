@@ -16,8 +16,10 @@ public class InstantExecutionController {
     private final InstantExecutionService executionService;
 
     @PostMapping("/{id}/execute")
-    public ResponseEntity<ExecutionResultResponse> execute(@PathVariable UUID id) {
-        return ResponseEntity.ok(executionService.execute(id));
+    public ResponseEntity<ExecutionResultResponse> execute(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID environmentId) {
+        return ResponseEntity.ok(executionService.execute(id, environmentId));
     }
 
     @GetMapping("/{id}/executions")

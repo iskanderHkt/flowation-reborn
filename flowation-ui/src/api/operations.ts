@@ -19,8 +19,10 @@ export const operationsApi = {
 
   delete: (id: string) => api.delete(`operations/${id}`),
 
-  execute: (id: string) =>
-    api.post(`operations/${id}/execute`).json<ExecutionResult>(),
+  execute: (id: string, environmentId?: string) =>
+    api.post(`operations/${id}/execute`, {
+      searchParams: environmentId ? { environmentId } : {},
+    }).json<ExecutionResult>(),
 
   getExecutions: (id: string) =>
     api.get(`operations/${id}/executions`).json<ExecutionResult[]>(),

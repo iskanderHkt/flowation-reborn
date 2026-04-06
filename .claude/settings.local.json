@@ -5,7 +5,12 @@
       "Bash(npm install:*)",
       "Bash(cd:*)",
       "Bash(npx tsc:*)",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "Bash(find /c/Users/ialymov/Desktop/personal/mixed/flowation-reborn -type f \\\\\\(-name *.sql -o -name docker-compose*.yml -o -name application*.yml -o -name application*.properties -o -name database-schema.md \\\\\\))",
+      "Bash(xargs cat:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

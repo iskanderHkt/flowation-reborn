@@ -10,3 +10,6 @@ spring:
     enabled: false
 server:
   port: 2121
+flowation:
+  execution:
+    max-nesting-depth: 10

@@ -1,5 +1,10 @@
 package kg.ademity.flowation_api_modulith.flow_module.operation;
 
+import kg.ademity.flowation_api_modulith.flow_module.flow.Flow;
+import kg.ademity.flowation_api_modulith.flow_module.flow.FlowRepository;
+import kg.ademity.flowation_api_modulith.flow_module.flow.step.FlowStep;
+import kg.ademity.flowation_api_modulith.flow_module.flow.step.FlowStepRepository;
+import kg.ademity.flowation_api_modulith.flow_module.flow.step.Binding;
 import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationConfig;
 import kg.ademity.flowation_api_modulith.shared.DevContext;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +18,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OperationService {
     private final OperationRepository repository;
+    private final FlowStepRepository flowStepRepository;
+    private final FlowRepository flowRepository;
     private final DevContext devContext;
 
     public Operation create(String name, OperationConfig config) {
@@ -50,6 +57,21 @@ public class OperationService {
     }
 
     public void delete(UUID operationId) {
+        List<FlowStep> linkedSteps = flowStepRepository.findAllByOperationIdAndBinding(operationId, Binding.LINKED);
+
+        if (!linkedSteps.isEmpty()) {
+            List<String> flowNames = linkedSteps.stream()
+                    .map(FlowStep::getFlowId)
+                    .distinct()
+                    .map(flowId -> flowRepository.findById(flowId)
+                            .map(Flow::getName)
+                            .orElse("Unknown flow"))
+                    .toList();
+
+            throw new RuntimeException(
+                    "Cannot delete operation: linked in flows: " + String.join(", ", flowNames));
+        }
+
         repository.deleteById(operationId);
     }
 }

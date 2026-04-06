@@ -53,7 +53,7 @@ export function useDeleteOperation() {
 export function useExecuteOperation(operationId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => operationsApi.execute(operationId),
+    mutationFn: (environmentId?: string) => operationsApi.execute(operationId, environmentId),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: KEYS.executions(operationId) }),
   })
