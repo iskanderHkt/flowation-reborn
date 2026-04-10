@@ -22,7 +22,10 @@ const COMPARATORS = [
   { value: 'GT', label: '> Greater Than' },
   { value: 'LT', label: '< Less Than' },
   { value: 'IS_NULL', label: 'Is Null' },
+  { value: 'IS_NOT_NULL', label: 'Is Not Null' },
 ]
+
+const UNARY_COMPARATORS = new Set(['IS_NULL', 'IS_NOT_NULL'])
 
 const OP_TYPES: { value: OperationType; label: string }[] = [
   { value: 'HTTP_REQUEST', label: 'HTTP Request' },
@@ -292,15 +295,17 @@ function AssertConfigForm({
             onChange={(e) => set({ comparator: e.target.value as typeof config.comparator })}
           />
         </div>
-        <div className="flex-1">
-          <Input
-            label="Expected"
-            value={config.expected}
-            onChange={(e) => set({ expected: e.target.value })}
-            placeholder="200"
-            className="font-mono text-xs"
-          />
-        </div>
+        {!UNARY_COMPARATORS.has(config.comparator) && (
+          <div className="flex-1">
+            <Input
+              label="Expected"
+              value={config.expected}
+              onChange={(e) => set({ expected: e.target.value })}
+              placeholder="200"
+              className="font-mono text-xs"
+            />
+          </div>
+        )}
       </div>
     </div>
   )

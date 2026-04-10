@@ -3,11 +3,12 @@ package kg.ademity.flowation_api_modulith.execution_module;
 import kg.ademity.flowation_api_modulith.execution_module.dto.ExecutionResultResponse;
 import kg.ademity.flowation_api_modulith.execution_module.executor.OperationExecutor;
 import kg.ademity.flowation_api_modulith.execution_module.executor.StepResult;
+import kg.ademity.flowation_api_modulith.execution_module.exception.StepExecutionException;
 import kg.ademity.flowation_api_modulith.execution_module.run.*;
 import kg.ademity.flowation_api_modulith.flow_module.operation.Operation;
 import kg.ademity.flowation_api_modulith.flow_module.operation.OperationService;
 import kg.ademity.flowation_api_modulith.environment_module.EnvironmentService;
-import kg.ademity.flowation_api_modulith.shared.DevContext;
+import kg.ademity.flowation_api_modulith.shared.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,14 +26,14 @@ public class InstantExecutionService {
     private final ExecutionRunRepository executionRunRepository;
     private final ExecutionStepResultRepository stepResultRepository;
     private final List<OperationExecutor> executors;
-    private final DevContext devContext;
+    private final TenantContext tenantContext;
     private final EnvironmentService environmentService;
 
     public ExecutionResultResponse execute(UUID operationId, UUID environmentId) {
         Operation operation = operationService.findById(operationId);
 
         ExecutionRun run = executionRunRepository.save(ExecutionRun.builder()
-                .ownerId(devContext.getDevUserId())
+                .ownerId(tenantContext.getOwnerId())
                 .runMode(RunMode.INSTANT)
                 .status(ExecutionStatus.RUNNING)
                 .operationId(operationId)
@@ -45,44 +46,52 @@ public class InstantExecutionService {
         OperationExecutor executor = executors.stream()
                 .filter(e -> e.supports(operation.getType()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("No executor found for type: " + operation.getType()));
+                .orElseThrow(() -> new StepExecutionException("No executor found for type: " + operation.getType()));
 
         Map<String, Object> context = new HashMap<>();
         if (environmentId != null) {
             context.putAll(environmentService.loadAsContext(environmentId));
         }
 
-        StepResult stepResult = executor.execute(operation.getConfigTemplate(), context);
+        ExecutionStepResult saved = null;
+        ExecutionStatus finalStatus = ExecutionStatus.FAILED;
+        Instant completedAt;
 
-        Instant completedAt = Instant.now();
+        try {
+            StepResult stepResult = executor.executeRaw(operation.getConfigTemplate(), context);
+            completedAt = Instant.now();
 
-        ExecutionStepResult saved = stepResultRepository.save(ExecutionStepResult.builder()
-                .executionRunId(run.getId())
-                .stepIndex(0)
-                .status(stepResult.status())
-                .requestSnapshot(stepResult.requestSnapshot())
-                .responseSnapshot(stepResult.responseSnapshot())
-                .errorMessage(stepResult.errorMessage())
-                .durationMs(stepResult.durationMs())
-                .startedAt(run.getStartedAt())
-                .completedAt(completedAt)
-                .build());
+            saved = stepResultRepository.save(ExecutionStepResult.builder()
+                    .executionRunId(run.getId())
+                    .stepIndex(0)
+                    .status(stepResult.status())
+                    .requestSnapshot(stepResult.requestSnapshot())
+                    .responseSnapshot(stepResult.responseSnapshot())
+                    .errorMessage(stepResult.errorMessage())
+                    .durationMs(stepResult.durationMs())
+                    .startedAt(run.getStartedAt())
+                    .completedAt(completedAt)
+                    .build());
 
-        ExecutionStatus finalStatus = stepResult.status() == ExecutionStatus.COMPLETED
-                ? ExecutionStatus.COMPLETED
-                : ExecutionStatus.FAILED;
-
-        executionRunRepository.save(ExecutionRun.builder()
-                .id(run.getId())
-                .ownerId(run.getOwnerId())
-                .runMode(run.getRunMode())
-                .status(finalStatus)
-                .operationId(operationId)
-                .executionPlan(run.getExecutionPlan())
-                .startedAt(run.getStartedAt())
-                .completedAt(completedAt)
-                .createdAt(run.getCreatedAt())
-                .build());
+            finalStatus = stepResult.status() == ExecutionStatus.COMPLETED
+                    ? ExecutionStatus.COMPLETED
+                    : ExecutionStatus.FAILED;
+        } catch (Exception e) {
+            completedAt = Instant.now();
+        } finally {
+            // always finalize run — prevents stuck RUNNING status on unexpected errors
+            executionRunRepository.save(ExecutionRun.builder()
+                    .id(run.getId())
+                    .ownerId(run.getOwnerId())
+                    .runMode(run.getRunMode())
+                    .status(finalStatus)
+                    .operationId(operationId)
+                    .executionPlan(run.getExecutionPlan())
+                    .startedAt(run.getStartedAt())
+                    .completedAt(Instant.now())
+                    .createdAt(run.getCreatedAt())
+                    .build());
+        }
 
         return new ExecutionResultResponse(
                 run.getId(),
@@ -91,10 +100,10 @@ public class InstantExecutionService {
                 finalStatus,
                 run.getStartedAt(),
                 completedAt,
-                saved.getDurationMs(),
-                saved.getRequestSnapshot(),
-                saved.getResponseSnapshot(),
-                saved.getErrorMessage()
+                saved != null ? saved.getDurationMs() : 0,
+                saved != null ? saved.getRequestSnapshot() : null,
+                saved != null ? saved.getResponseSnapshot() : null,
+                saved != null ? saved.getErrorMessage() : null
         );
     }
 

@@ -10,7 +10,10 @@ const COMPARATOR_LABELS: Record<string, string> = {
   GT: '>',
   LT: '<',
   IS_NULL: 'is null',
+  IS_NOT_NULL: 'is not null',
 }
+
+const UNARY_COMPARATORS = new Set(['IS_NULL', 'IS_NOT_NULL'])
 
 export function AssertResultView({
   request,
@@ -39,7 +42,9 @@ export function AssertResultView({
           <div className="flex items-center gap-2 text-xs font-mono flex-wrap">
             <span className="text-[var(--color-text-secondary)]">{expression}</span>
             <Badge variant="muted">{COMPARATOR_LABELS[comparator] ?? comparator}</Badge>
-            <span className="text-[var(--color-text-secondary)]">{expected}</span>
+            {!UNARY_COMPARATORS.has(comparator) && (
+              <span className="text-[var(--color-text-secondary)]">{expected}</span>
+            )}
           </div>
         </div>
       </section>
@@ -71,12 +76,14 @@ export function AssertResultView({
                   {actual || '(empty)'}
                 </span>
               </div>
-              <div className="flex items-baseline gap-2 text-xs">
-                <span className="text-[var(--color-text-muted)] shrink-0">Expected:</span>
-                <span className="font-mono text-[var(--color-text-secondary)]">
-                  {expected || '(empty)'}
-                </span>
-              </div>
+              {!UNARY_COMPARATORS.has(comparator) && (
+                <div className="flex items-baseline gap-2 text-xs">
+                  <span className="text-[var(--color-text-muted)] shrink-0">Expected:</span>
+                  <span className="font-mono text-[var(--color-text-secondary)]">
+                    {expected || '(empty)'}
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <span className="text-xs text-[var(--color-text-muted)] italic">No result data</span>

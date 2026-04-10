@@ -12,8 +12,13 @@ import kg.ademity.flowation_api_modulith.flow_module.flow.step.FlowStepService;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.OnFailStrategy;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.StepKind;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.extraction.ExtractionRule;
+import kg.ademity.flowation_api_modulith.flow_module.compiler.CompiledStep;
+import kg.ademity.flowation_api_modulith.flow_module.compiler.FlowCompiler;
+import kg.ademity.flowation_api_modulith.execution_module.AbsentValue;
+import kg.ademity.flowation_api_modulith.execution_module.exception.StepExecutionException;
+import kg.ademity.flowation_api_modulith.flow_module.compiler.FlowCompilationException;
 import kg.ademity.flowation_api_modulith.environment_module.EnvironmentService;
-import kg.ademity.flowation_api_modulith.shared.DevContext;
+import kg.ademity.flowation_api_modulith.shared.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +35,7 @@ public class FlowExecutionService {
     private final ExecutionRunRepository runRepository;
     private final ExecutionStepResultRepository stepResultRepository;
     private final List<OperationExecutor> executors;
-    private final DevContext devContext;
+    private final TenantContext tenantContext;
     private final EnvironmentService environmentService;
 
     public FlowExecutionResultResponse execute(UUID flowId, UUID environmentId) {
@@ -40,7 +45,7 @@ public class FlowExecutionService {
         List<CompiledStep> compiledSteps = compiler.compile(flow);
 
         if (compiledSteps.isEmpty()) {
-            throw new RuntimeException("Flow '" + flow.getName() + "' has no executable steps");
+            throw new FlowCompilationException("Flow '" + flow.getName() + "' has no executable steps");
         }
 
         // build execution plan snapshot
@@ -48,7 +53,7 @@ public class FlowExecutionService {
 
         // create execution run
         ExecutionRun run = runRepository.save(ExecutionRun.builder()
-                .ownerId(devContext.getDevUserId())
+                .ownerId(tenantContext.getOwnerId())
                 .runMode(RunMode.FLOW)
                 .status(ExecutionStatus.RUNNING)
                 .flowId(flowId)
@@ -67,73 +72,75 @@ public class FlowExecutionService {
         ExecutionStatus overallStatus = ExecutionStatus.COMPLETED;
         boolean stopped = false;
 
-        for (CompiledStep compiledStep : compiledSteps) {
-            if (stopped) {
-                // mark remaining steps as SKIPPED
-                ExecutionStepResult skipped = stepResultRepository.save(ExecutionStepResult.builder()
+        try {
+            for (CompiledStep compiledStep : compiledSteps) {
+                if (stopped) {
+                    // mark remaining steps as SKIPPED
+                    ExecutionStepResult skipped = stepResultRepository.save(ExecutionStepResult.builder()
+                            .executionRunId(run.getId())
+                            .stepIndex(compiledStep.stepIndex())
+                            .stepRefId(compiledStep.stepRefId())
+                            .status(ExecutionStatus.SKIPPED)
+                            .startedAt(Instant.now())
+                            .completedAt(Instant.now())
+                            .build());
+                    stepResults.add(skipped);
+                    continue;
+                }
+
+                // find executor
+                OperationExecutor executor = executors.stream()
+                        .filter(e -> e.supports(compiledStep.operationType()))
+                        .findFirst()
+                        .orElseThrow(() -> new StepExecutionException(
+                                "No executor for type: " + compiledStep.operationType()));
+
+                // execute step with runtime context
+                Instant stepStart = Instant.now();
+                StepResult result = executor.executeRaw(compiledStep.mergedConfig(), runtimeContext);
+                Instant stepEnd = Instant.now();
+
+                // save step result
+                ExecutionStepResult savedStep = stepResultRepository.save(ExecutionStepResult.builder()
                         .executionRunId(run.getId())
                         .stepIndex(compiledStep.stepIndex())
                         .stepRefId(compiledStep.stepRefId())
-                        .status(ExecutionStatus.SKIPPED)
-                        .startedAt(Instant.now())
-                        .completedAt(Instant.now())
+                        .status(result.status())
+                        .requestSnapshot(result.requestSnapshot())
+                        .responseSnapshot(result.responseSnapshot())
+                        .errorMessage(result.errorMessage())
+                        .durationMs(result.durationMs())
+                        .startedAt(stepStart)
+                        .completedAt(stepEnd)
                         .build());
-                stepResults.add(skipped);
-                continue;
-            }
+                stepResults.add(savedStep);
 
-            // find executor
-            OperationExecutor executor = executors.stream()
-                    .filter(e -> e.supports(compiledStep.operationType()))
-                    .findFirst()
-                    .orElseThrow(() -> new RuntimeException(
-                            "No executor for type: " + compiledStep.operationType()));
-
-            // execute step with runtime context
-            Instant stepStart = Instant.now();
-            StepResult result = executor.execute(compiledStep.mergedConfig(), runtimeContext);
-            Instant stepEnd = Instant.now();
-
-            // save step result
-            ExecutionStepResult savedStep = stepResultRepository.save(ExecutionStepResult.builder()
-                    .executionRunId(run.getId())
-                    .stepIndex(compiledStep.stepIndex())
-                    .stepRefId(compiledStep.stepRefId())
-                    .status(result.status())
-                    .requestSnapshot(result.requestSnapshot())
-                    .responseSnapshot(result.responseSnapshot())
-                    .errorMessage(result.errorMessage())
-                    .durationMs(result.durationMs())
-                    .startedAt(stepStart)
-                    .completedAt(stepEnd)
-                    .build());
-            stepResults.add(savedStep);
-
-            // apply extraction rules → write to runtime context
-            if (result.status() == ExecutionStatus.COMPLETED && result.responseSnapshot() != null) {
-                for (ExtractionRule rule : compiledStep.extractionRules()) {
-                    Object extracted = JsonPathExtractor.extract(result.responseSnapshot(), rule.getSourcePath());
-                    if (extracted != null) {
-                        runtimeContext.put(rule.getTargetVariable(), extracted);
+                // apply extraction rules → write to runtime context
+                if (result.status() == ExecutionStatus.COMPLETED && result.responseSnapshot() != null) {
+                    for (ExtractionRule rule : compiledStep.extractionRules()) {
+                        Object extracted = JsonPathExtractor.extract(result.responseSnapshot(), rule.getSourcePath());
+                        runtimeContext.put(rule.getTargetVariable(), extracted != null ? extracted : AbsentValue.INSTANCE);
                     }
                 }
-            }
 
-            // handle failure
-            if (result.status() == ExecutionStatus.FAILED) {
-                overallStatus = ExecutionStatus.FAILED;
-                if (compiledStep.onFail() == OnFailStrategy.STOP_FLOW) {
-                    stopped = true;
+                // handle failure
+                if (result.status() == ExecutionStatus.FAILED) {
+                    overallStatus = ExecutionStatus.FAILED;
+                    if (compiledStep.onFail() == OnFailStrategy.STOP_FLOW) {
+                        stopped = true;
+                    }
+                    // SKIP_AND_CONTINUE — loop continues, but overall status stays FAILED
                 }
-                // SKIP_AND_CONTINUE — loop continues, but overall status stays FAILED
             }
+        } catch (Exception e) {
+            overallStatus = ExecutionStatus.FAILED;
+        } finally {
+            // always finalize run — prevents stuck RUNNING status on unexpected errors
+            Instant completedAt = Instant.now();
+            run.setStatus(overallStatus);
+            run.setCompletedAt(completedAt);
+            runRepository.save(run);
         }
-
-        // finalize run
-        Instant completedAt = Instant.now();
-        run.setStatus(overallStatus);
-        run.setCompletedAt(completedAt);
-        runRepository.save(run);
 
         return toResponse(run, stepResults);
     }
@@ -156,15 +163,15 @@ public class FlowExecutionService {
         }
 
         CompiledStep compiled = compiler.compileStep(step)
-                .orElseThrow(() -> new RuntimeException("Cannot compile step " + stepId));
+                .orElseThrow(() -> new FlowCompilationException("Cannot compile step " + stepId));
 
         OperationExecutor executor = executors.stream()
                 .filter(e -> e.supports(compiled.operationType()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("No executor for type: " + compiled.operationType()));
+                .orElseThrow(() -> new StepExecutionException("No executor for type: " + compiled.operationType()));
 
         Instant start = Instant.now();
-        StepResult result = executor.execute(compiled.mergedConfig(), new HashMap<>());
+        StepResult result = executor.executeRaw(compiled.mergedConfig(), new HashMap<>());
         Instant end = Instant.now();
 
         return new StepResultResponse(

@@ -2,9 +2,11 @@ package kg.ademity.flowation_api_modulith.environment_module;
 
 import kg.ademity.flowation_api_modulith.environment_module.dto.EnvironmentResponse;
 import kg.ademity.flowation_api_modulith.environment_module.dto.UpsertVariablesRequest;
-import kg.ademity.flowation_api_modulith.shared.DevContext;
+import kg.ademity.flowation_api_modulith.shared.TenantContext;
+import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,11 +20,11 @@ public class EnvironmentService {
 
     private final EnvironmentRepository environmentRepository;
     private final EnvVariableRepository envVariableRepository;
-    private final DevContext devContext;
+    private final TenantContext tenantContext;
 
     public EnvironmentResponse create(String name) {
         Environment env = environmentRepository.save(Environment.builder()
-                .ownerId(devContext.getDevUserId())
+                .ownerId(tenantContext.getOwnerId())
                 .name(name)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
@@ -32,24 +34,28 @@ public class EnvironmentService {
 
     public EnvironmentResponse findById(UUID id) {
         Environment env = environmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Environment not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Environment", id));
         List<EnvVariable> variables = envVariableRepository.findAllByEnvironmentId(id);
         return toResponse(env, variables);
     }
 
     public List<EnvironmentResponse> findAll() {
-        List<Environment> envs = environmentRepository.findAllByOwnerId(devContext.getDevUserId());
+        List<Environment> envs = environmentRepository.findAllByOwnerId(tenantContext.getOwnerId());
+        if (envs.isEmpty()) return List.of();
+
+        List<UUID> envIds = envs.stream().map(Environment::getId).toList();
+        Map<UUID, List<EnvVariable>> varsByEnvId = envVariableRepository.findAllByEnvironmentIdIn(envIds)
+                .stream()
+                .collect(Collectors.groupingBy(EnvVariable::getEnvironmentId));
+
         return envs.stream()
-                .map(env -> {
-                    List<EnvVariable> vars = envVariableRepository.findAllByEnvironmentId(env.getId());
-                    return toResponse(env, vars);
-                })
+                .map(env -> toResponse(env, varsByEnvId.getOrDefault(env.getId(), List.of())))
                 .toList();
     }
 
     public EnvironmentResponse update(UUID id, String name) {
         Environment env = environmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Environment not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Environment", id));
         env.setName(name);
         env.setUpdatedAt(Instant.now());
         environmentRepository.save(env);
@@ -61,19 +67,21 @@ public class EnvironmentService {
         environmentRepository.deleteById(id);
     }
 
+    @Transactional
     public EnvironmentResponse upsertVariables(UUID id, List<UpsertVariablesRequest.EnvVariableEntry> entries) {
         Environment env = environmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Environment not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Environment", id));
 
         envVariableRepository.deleteAllByEnvironmentId(id);
 
-        List<EnvVariable> saved = entries.stream()
-                .map(e -> envVariableRepository.save(EnvVariable.builder()
+        List<EnvVariable> toSave = entries.stream()
+                .map(e -> EnvVariable.builder()
                         .environmentId(id)
                         .key(e.key())
                         .value(e.value())
-                        .build()))
+                        .build())
                 .toList();
+        List<EnvVariable> saved = (List<EnvVariable>) envVariableRepository.saveAll(toSave);
 
         env.setUpdatedAt(Instant.now());
         environmentRepository.save(env);

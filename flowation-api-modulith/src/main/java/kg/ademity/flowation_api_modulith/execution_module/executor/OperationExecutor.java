@@ -5,9 +5,14 @@ import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationC
 
 import java.util.Map;
 
-public interface OperationExecutor {
+public interface OperationExecutor<T extends OperationConfig> {
 
     boolean supports(OperationType type);
 
-    StepResult execute(OperationConfig config, Map<String, Object> context);
+    StepResult execute(T config, Map<String, Object> context);
+
+    @SuppressWarnings("unchecked")
+    default StepResult executeRaw(OperationConfig config, Map<String, Object> context) {
+        return execute((T) config, context);
+    }
 }

@@ -5,15 +5,13 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 @Component
-public final class DevContext {
+public final class DevContext implements TenantContext {
 
-    private final UUID DEV_USER_ID;
+    private static final UUID DEV_USER_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000001");
 
-    private DevContext() {
-        DEV_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    }
-
-    public UUID getDevUserId() {
+    @Override
+    public UUID getOwnerId() {
         return DEV_USER_ID;
     }
 }

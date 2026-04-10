@@ -1,5 +1,7 @@
 package kg.ademity.flowation_api_modulith.execution_module.executor;
 
+import kg.ademity.flowation_api_modulith.execution_module.AbsentValue;
+
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,7 +18,13 @@ class VariableResolver {
         StringBuilder result = new StringBuilder();
         while (matcher.find()) {
             String varName = matcher.group(1);
-            Object value = context.getOrDefault(varName, matcher.group(0));
+            if (!context.containsKey(varName)) {
+                throw new IllegalStateException("Variable '{{" + varName + "}}' not found in context");
+            }
+            Object value = context.get(varName);
+            if (value instanceof AbsentValue) {
+                throw new IllegalStateException("Variable '{{" + varName + "}}' has no value");
+            }
             matcher.appendReplacement(result, Matcher.quoteReplacement(value.toString()));
         }
         matcher.appendTail(result);

@@ -1,4 +1,4 @@
-package kg.ademity.flowation_api_modulith.execution_module.flow;
+package kg.ademity.flowation_api_modulith.flow_module.compiler;
 
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.OnFailStrategy;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.extraction.ExtractionRule;

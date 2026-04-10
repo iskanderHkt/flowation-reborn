@@ -6,6 +6,7 @@ import kg.ademity.flowation_api_modulith.flow_module.operation.OperationType;
 import kg.ademity.flowation_api_modulith.flow_module.operation.config.HttpOperationConfig;
 import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationConfig;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -16,11 +17,12 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
-public class HttpOperationExecutor implements OperationExecutor {
+public class HttpOperationExecutor implements OperationExecutor<HttpOperationConfig> {
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper;
 
     @Override
@@ -29,8 +31,7 @@ public class HttpOperationExecutor implements OperationExecutor {
     }
 
     @Override
-    public StepResult execute(OperationConfig config, Map<String, Object> context) {
-        HttpOperationConfig http = (HttpOperationConfig) config;
+    public StepResult execute(HttpOperationConfig http, Map<String, Object> context) {
 
         String url = VariableResolver.resolve(http.getUrl(), context);
         String body = VariableResolver.resolve(http.getBody(), context);
@@ -58,8 +59,24 @@ public class HttpOperationExecutor implements OperationExecutor {
 
             builder.method(http.getMethod(), bodyPublisher);
 
-            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpRequest request = builder.build();
+
+            log.debug(">>> HTTP REQUEST");
+            log.debug("    {} {}", request.method(), request.uri());
+            log.debug("    timeout: {}ms", timeoutMs);
+            // Note: request.headers() shows only user-set headers.
+            // Host and Content-Length added by HttpClient are visible only via wire logging
+            // (enable with JVM arg: -Djdk.httpclient.HttpClient.log=requests,headers,content,errors)
+            log.debug("    headers (user-set): {}", request.headers().map());
+            log.debug("    body: {}", body);
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             int durationMs = (int) (System.currentTimeMillis() - start);
+
+            log.debug("<<< HTTP RESPONSE [{}ms]", durationMs);
+            log.debug("    status: {}", response.statusCode());
+            log.debug("    headers: {}", response.headers().map());
+            log.debug("    body: {}", response.body());
 
             Map<String, Object> responseSnapshot = new HashMap<>();
             responseSnapshot.put("status", response.statusCode());
@@ -75,6 +92,7 @@ public class HttpOperationExecutor implements OperationExecutor {
             return StepResult.success(requestSnapshot, responseSnapshot, durationMs);
         } catch (Exception e) {
             int durationMs = (int) (System.currentTimeMillis() - start);
+            log.debug("<<< HTTP ERROR [{}ms]: {}", durationMs, e.getMessage());
             return StepResult.failure(requestSnapshot, e.getMessage(), durationMs);
         }
     }

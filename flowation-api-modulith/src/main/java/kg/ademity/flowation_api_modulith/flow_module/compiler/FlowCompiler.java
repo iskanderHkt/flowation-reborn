@@ -1,4 +1,4 @@
-package kg.ademity.flowation_api_modulith.execution_module.flow;
+package kg.ademity.flowation_api_modulith.flow_module.compiler;
 
 import kg.ademity.flowation_api_modulith.flow_module.flow.Flow;
 import kg.ademity.flowation_api_modulith.flow_module.flow.FlowService;
@@ -8,6 +8,7 @@ import kg.ademity.flowation_api_modulith.flow_module.flow.step.extraction.Extrac
 import kg.ademity.flowation_api_modulith.flow_module.operation.Operation;
 import kg.ademity.flowation_api_modulith.flow_module.operation.OperationService;
 import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationConfig;
+import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -36,7 +37,7 @@ public class FlowCompiler {
 
     private void compileRecursive(Flow flow, List<CompiledStep> steps, int depth) {
         if (depth > maxNestingDepth) {
-            throw new RuntimeException(
+            throw new FlowCompilationException(
                     "Maximum nesting depth of " + maxNestingDepth + " exceeded at flow: " + flow.getName());
         }
 
@@ -47,17 +48,15 @@ public class FlowCompiler {
                 Flow nestedFlow = flowService.findById(flowStep.getNestedFlowId());
                 compileRecursive(nestedFlow, steps, depth + 1);
             } else {
-                // OPERATION_STEP
                 OperationConfig config = resolveConfig(flowStep);
                 String operationName = resolveOperationName(flowStep);
-                var operationType = resolveOperationType(flowStep, config);
                 List<ExtractionRule> rules = extractionRuleService.getRulesByStepId(flowStep.getId());
 
                 steps.add(new CompiledStep(
                         steps.size(),
                         flowStep.getId(),
                         operationName,
-                        operationType,
+                        config.type(),
                         config,
                         flowStep.getOnFail(),
                         rules
@@ -77,7 +76,7 @@ public class FlowCompiler {
                 0,
                 step.getId(),
                 resolveOperationName(step),
-                resolveOperationType(step, config),
+                config.type(),
                 config,
                 step.getOnFail(),
                 rules
@@ -87,14 +86,11 @@ public class FlowCompiler {
     OperationConfig resolveConfig(FlowStep step) {
         if (step.getBinding() == Binding.LINKED) {
             Operation operation = operationService.findById(step.getOperationId());
-            // TODO: merge configOverride on top of configTemplate if configOverride is not null
-            // For now, configOverride is ignored — full override support requires deep merge per config type
             if (step.getConfigOverride() != null) {
-                return step.getConfigOverride();
+                return OperationConfig.merge(operation.getConfigTemplate(), step.getConfigOverride());
             }
             return operation.getConfigTemplate();
         } else {
-            // DETACHED — own_config is the full config
             return step.getOwnConfig();
         }
     }
@@ -107,10 +103,5 @@ public class FlowCompiler {
             return operationService.findById(step.getSourceOperationId()).getName() + " (detached)";
         }
         return "Detached operation";
-    }
-
-    private kg.ademity.flowation_api_modulith.flow_module.operation.OperationType resolveOperationType(
-            FlowStep step, OperationConfig config) {
-        return config.type();
     }
 }

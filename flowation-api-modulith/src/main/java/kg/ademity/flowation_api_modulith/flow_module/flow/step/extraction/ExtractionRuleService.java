@@ -3,6 +3,7 @@ package kg.ademity.flowation_api_modulith.flow_module.flow.step.extraction;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.FlowStepService;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.extraction.dto.request.ExtractionRuleCreateRequest;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.extraction.dto.request.ExtractionRuleUpdateRequest;
+import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -40,8 +41,7 @@ public class ExtractionRuleService {
 
         ExtractionRule rule = ruleRepository.findById(ruleId)
                 .filter(r -> r.getFlowStepId().equals(stepId))
-                .orElseThrow(() -> new RuntimeException(
-                        "Rule " + ruleId + " not found in step " + stepId));
+                .orElseThrow(() -> new NotFoundException("Rule " + ruleId + " not found in step " + stepId));
 
         rule.setSourcePath(request.sourcePath());
         rule.setTargetVariable(request.targetVariable());
@@ -54,8 +54,7 @@ public class ExtractionRuleService {
 
         ExtractionRule rule = ruleRepository.findById(ruleId)
                 .filter(r -> r.getFlowStepId().equals(stepId))
-                .orElseThrow(() -> new RuntimeException(
-                        "Rule " + ruleId + " not found in step " + stepId));
+                .orElseThrow(() -> new NotFoundException("Rule " + ruleId + " not found in step " + stepId));
 
         ruleRepository.delete(rule);
     }

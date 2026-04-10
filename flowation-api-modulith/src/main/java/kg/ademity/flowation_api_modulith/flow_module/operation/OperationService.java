@@ -6,7 +6,9 @@ import kg.ademity.flowation_api_modulith.flow_module.flow.step.FlowStep;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.FlowStepRepository;
 import kg.ademity.flowation_api_modulith.flow_module.flow.step.Binding;
 import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationConfig;
-import kg.ademity.flowation_api_modulith.shared.DevContext;
+import kg.ademity.flowation_api_modulith.shared.TenantContext;
+import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
+import kg.ademity.flowation_api_modulith.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,11 +22,11 @@ public class OperationService {
     private final OperationRepository repository;
     private final FlowStepRepository flowStepRepository;
     private final FlowRepository flowRepository;
-    private final DevContext devContext;
+    private final TenantContext tenantContext;
 
     public Operation create(String name, OperationConfig config) {
         Operation operationToCreate = Operation.builder()
-                .ownerId(devContext.getDevUserId())
+                .ownerId(tenantContext.getOwnerId())
                 .name(name)
                 .type(config.type())
                 .configTemplate(config)
@@ -38,16 +40,16 @@ public class OperationService {
     public Operation findById(UUID operationId) {
 
         return repository.findById(operationId)
-                .orElseThrow(() -> new RuntimeException("Operation with id: " + operationId + " was not found"));
+                .orElseThrow(() -> new NotFoundException("Operation", operationId));
     }
 
     public List<Operation> findAll() {
-        return repository.findAllByOwnerId(devContext.getDevUserId());
+        return repository.findAllByOwnerId(tenantContext.getOwnerId());
     }
 
     public Operation update(UUID operationId, String name, OperationConfig config) {
         Operation operationFound = repository.findById(operationId)
-                .orElseThrow(() -> new RuntimeException("Operation with id: " + operationId + " was not found"));
+                .orElseThrow(() -> new NotFoundException("Operation", operationId));
 
         operationFound.setName(name);
         operationFound.setConfigTemplate(config);
@@ -68,7 +70,7 @@ public class OperationService {
                             .orElse("Unknown flow"))
                     .toList();
 
-            throw new RuntimeException(
+            throw new ValidationException(
                     "Cannot delete operation: linked in flows: " + String.join(", ", flowNames));
         }
 

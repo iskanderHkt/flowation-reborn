@@ -13,3 +13,11 @@ server:
 flowation:
   execution:
     max-nesting-depth: 10
+
+logging:
+  level:
+    # SLF4J логи из HttpOperationExecutor (>>> REQUEST / <<< RESPONSE)
+    kg.ademity.flowation_api_modulith.execution_module.executor.HttpOperationExecutor: DEBUG
+    # Wire-level логи из JDK HttpClient (включая Host, Content-Length, которые HttpClient добавляет сам)
+    # Работает только если JVM запущена с: -Djdk.httpclient.HttpClient.log=requests,headers,content,errors
+    jdk.internal.net.http: DEBUG

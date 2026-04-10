@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class SqlOperationExecutor implements OperationExecutor {
+public class SqlOperationExecutor implements OperationExecutor<SqlOperationConfig> {
 
     @Override
     public boolean supports(OperationType type) {
@@ -20,8 +20,7 @@ public class SqlOperationExecutor implements OperationExecutor {
     }
 
     @Override
-    public StepResult execute(OperationConfig config, Map<String, Object> context) {
-        SqlOperationConfig sql = (SqlOperationConfig) config;
+    public StepResult execute(SqlOperationConfig sql, Map<String, Object> context) {
 
         String connectionString = VariableResolver.resolve(sql.getConnectionString(), context);
         String query = VariableResolver.resolve(sql.getQuery(), context);

@@ -7,5 +7,6 @@ import java.util.UUID;
 
 public interface EnvVariableRepository extends CrudRepository<EnvVariable, UUID> {
     List<EnvVariable> findAllByEnvironmentId(UUID environmentId);
+    List<EnvVariable> findAllByEnvironmentIdIn(List<UUID> environmentIds);
     void deleteAllByEnvironmentId(UUID environmentId);
 }

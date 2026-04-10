@@ -7,8 +7,13 @@ import kg.ademity.flowation_api_modulith.flow_module.flow.step.dto.request.Reord
 import kg.ademity.flowation_api_modulith.flow_module.operation.Operation;
 import kg.ademity.flowation_api_modulith.flow_module.operation.OperationService;
 import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationConfig;
+import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
+import kg.ademity.flowation_api_modulith.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
@@ -19,10 +24,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FlowStepService {
 
+    @Value("${flowation.execution.max-nesting-depth:10}")
+    private int maxNestingDepth;
+
     private final FlowStepRepository flowStepRepository;
     private final FlowService flowService;
     private final OperationService operationService;
 
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public FlowStep addStep(UUID flowId, FlowStepCreateRequest request) {
         // verify flow exists and belongs to current user
         flowService.findById(flowId);
@@ -69,8 +78,7 @@ public class FlowStepService {
     public FlowStep getStep(UUID flowId, UUID stepId) {
         return flowStepRepository.findById(stepId)
                 .filter(s -> s.getFlowId().equals(flowId))
-                .orElseThrow(() -> new RuntimeException(
-                        "Step " + stepId + " not found in flow " + flowId));
+                .orElseThrow(() -> new NotFoundException("Step " + stepId + " not found in flow " + flowId));
     }
 
     public List<FlowStep> getAllSteps(UUID flowId) {
@@ -104,6 +112,7 @@ public class FlowStepService {
         return flowStepRepository.save(step);
     }
 
+    @Transactional
     public void deleteStep(UUID flowId, UUID stepId) {
         FlowStep step = getStep(flowId, stepId);
         int deletedOrder = step.getStepOrder();
@@ -120,6 +129,7 @@ public class FlowStepService {
         }
     }
 
+    @Transactional
     public void reorderSteps(UUID flowId, List<ReorderEntry> entries) {
         flowService.findById(flowId);
 
@@ -136,29 +146,40 @@ public class FlowStepService {
     }
 
     /**
-     * DFS cycle detection: walks from nestedFlowId down through all nested FLOW_STEPs.
-     * If we encounter parentFlowId anywhere — it's a cycle.
+     * Validates that adding nestedFlowId into parentFlowId:
+     * 1. Does not create a cycle (DFS path-based, handles diamond-shaped DAGs correctly)
+     * 2. Does not exceed maxNestingDepth
+     *
+     * depth=1 means parentFlowId directly contains nestedFlowId.
      */
     private void validateNoCycle(UUID parentFlowId, UUID nestedFlowId) {
-        Set<UUID> visited = new HashSet<>();
-        visited.add(parentFlowId);
-        checkCycleRecursive(nestedFlowId, visited);
+        Set<UUID> path = new HashSet<>();
+        path.add(parentFlowId);
+        checkRecursive(nestedFlowId, path, 1);
     }
 
-    private void checkCycleRecursive(UUID flowId, Set<UUID> visited) {
-        if (!visited.add(flowId)) {
-            throw new RuntimeException(
+    private void checkRecursive(UUID flowId, Set<UUID> path, int depth) {
+        if (path.contains(flowId)) {
+            throw new ValidationException(
                     "Cycle detected: flow " + flowId + " creates a circular reference");
         }
+        if (depth > maxNestingDepth) {
+            throw new ValidationException(
+                    "Maximum nesting depth of " + maxNestingDepth + " exceeded");
+        }
 
-        List<FlowStep> flowSteps = flowStepRepository.findAllByFlowIdOrderByStepOrder(flowId)
+        path.add(flowId);
+
+        List<FlowStep> nestedSteps = flowStepRepository.findAllByFlowIdOrderByStepOrder(flowId)
                 .stream()
                 .filter(s -> s.getStepKind() == StepKind.FLOW_STEP && s.getNestedFlowId() != null)
                 .toList();
 
-        for (FlowStep step : flowSteps) {
-            checkCycleRecursive(step.getNestedFlowId(), visited);
+        for (FlowStep step : nestedSteps) {
+            checkRecursive(step.getNestedFlowId(), path, depth + 1);
         }
+
+        path.remove(flowId);
     }
 
 }

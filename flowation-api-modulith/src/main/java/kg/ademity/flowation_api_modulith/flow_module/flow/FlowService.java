@@ -1,6 +1,7 @@
 package kg.ademity.flowation_api_modulith.flow_module.flow;
 
-import kg.ademity.flowation_api_modulith.shared.DevContext;
+import kg.ademity.flowation_api_modulith.shared.TenantContext;
+import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,11 +13,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FlowService {
     private final FlowRepository flowRepository;
-    private final DevContext context;
+    private final TenantContext tenantContext;
 
     public Flow create(String name, String description) {
         return flowRepository.save(Flow.builder()
-                .ownerId(context.getDevUserId())
+                .ownerId(tenantContext.getOwnerId())
                 .name(name)
                 .description(description)
                 .createdAt(Instant.now())
@@ -26,16 +27,16 @@ public class FlowService {
 
     public Flow findById(UUID id) {
         return flowRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Flow with id: " + id + " was not found"));
+                .orElseThrow(() -> new NotFoundException("Flow", id));
     }
 
     public List<Flow> findAll() {
-        return flowRepository.findAllByOwnerId(context.getDevUserId());
+        return flowRepository.findAllByOwnerId(tenantContext.getOwnerId());
     }
 
     public Flow update(UUID id, String name, String description) {
         Flow flowFound = flowRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Flow with id: " + id + " was not found"));
+                .orElseThrow(() -> new NotFoundException("Flow", id));
 
         flowFound.setName(name);
         flowFound.setDescription(description);
