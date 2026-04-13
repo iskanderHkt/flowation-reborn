@@ -4,7 +4,7 @@ import {
   Zap,
   GitBranch,
   Globe,
-  Play,
+  Layers,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -18,10 +18,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/operations', label: 'Operations', icon: Zap },
   { to: '/flows', label: 'Flows', icon: GitBranch },
+  { to: '/catalog', label: 'Catalog', icon: Zap },
   { to: '/environments', label: 'Environments', icon: Globe },
-  { to: '/executions', label: 'Executions', icon: Play, disabled: true },
+  { to: '/batch', label: 'Batch', icon: Layers, disabled: true },
 ]
 
 export function Sidebar() {

@@ -53,7 +53,7 @@ export function OperationNewPage() {
       const op = await createMutation.mutateAsync({ name: name.trim(), config })
       setSavedId(op.id)
       toast({ title: 'Created', variant: 'success' })
-      navigate({ to: '/operations/$operationId', params: { operationId: op.id } })
+      navigate({ to: '/catalog/$operationId', params: { operationId: op.id } })
     } catch (err) {
       toast({ title: 'Save failed', description: String(err), variant: 'error' })
     }
@@ -78,7 +78,7 @@ export function OperationNewPage() {
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] shrink-0">
         <button
-          onClick={() => navigate({ to: '/operations' })}
+          onClick={() => navigate({ to: '/catalog' })}
           className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
         >
           <ArrowLeft size={16} />

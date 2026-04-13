@@ -25,7 +25,7 @@ const TYPE_LABELS: Record<OperationType, string> = {
 }
 
 export function OperationEditPage() {
-  const { operationId } = useParams({ from: '/operations/$operationId' })
+  const { operationId } = useParams({ from: '/catalog/$operationId' })
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -135,7 +135,7 @@ export function OperationEditPage() {
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] shrink-0">
         <button
-          onClick={() => navigate({ to: '/operations' })}
+          onClick={() => navigate({ to: '/catalog' })}
           className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
         >
           <ArrowLeft size={16} />

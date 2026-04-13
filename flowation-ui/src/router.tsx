@@ -24,13 +24,13 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: '/operations' })
+    throw redirect({ to: '/catalog' })
   },
 })
 
 const operationsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/operations',
+  path: '/catalog',
   component: () => (
     <ErrorBoundary>
       <OperationsPage />
@@ -40,7 +40,7 @@ const operationsRoute = createRoute({
 
 const operationNewRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/operations/new',
+  path: '/catalog/new',
   component: () => (
     <ErrorBoundary>
       <OperationNewPage />
@@ -50,7 +50,7 @@ const operationNewRoute = createRoute({
 
 const operationEditRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/operations/$operationId',
+  path: '/catalog/$operationId',
   component: () => (
     <ErrorBoundary>
       <OperationEditPage />

@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { useFlow, useFlowSteps, useAddFlowStep, useDeleteFlowStep, useExecuteFlow, useFlowExecutionHistory, useMultipleFlowSteps } from '@/hooks/use-flows.ts'
-import { useOperations } from '@/hooks/use-operations.ts'
+import { useOperations, useCreateOperation } from '@/hooks/use-operations.ts'
 import { useFlows } from '@/hooks/use-flows.ts'
 import { useEnvironments } from '@/hooks/use-environments.ts'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -15,7 +15,7 @@ import { FlowVariablesPanel } from '@/components/flow-editor/flow-variables-pane
 import { ResizeHandle } from '@/components/resize-handle.tsx'
 import { ArrowLeft, Play, ChevronRight, ChevronLeft } from 'lucide-react'
 import { useState, useMemo, useCallback } from 'react'
-import type { FlowStepCreateRequest, ExecutionStatus, FlowExecutionResult } from '@/api/types.ts'
+import type { FlowStepCreateRequest, ExecutionStatus, FlowExecutionResult, OperationConfig, OnFailStrategy } from '@/api/types.ts'
 
 export function FlowEditPage() {
   const { flowId } = useParams({ strict: false }) as { flowId: string }
@@ -33,6 +33,7 @@ export function FlowEditPage() {
 
   const addStepMutation = useAddFlowStep(activeFlowId)
   const deleteStepMutation = useDeleteFlowStep(activeFlowId)
+  const createOperationMutation = useCreateOperation()
   const executeMutation = useExecuteFlow(flowId)
   const { data: executionHistory = [] } = useFlowExecutionHistory(flowId)
 
@@ -90,6 +91,39 @@ export function FlowEditPage() {
       toast({ title: 'Failed to add step', description: String(err), variant: 'error' })
     }
   }, [addStepMutation, toast])
+
+  const handleCreateAndAddStep = useCallback(async ({
+    name,
+    config,
+    saveToСatalog,
+    binding,
+    onFail,
+  }: {
+    name: string
+    config: OperationConfig
+    saveToСatalog: boolean
+    binding: 'LINKED' | 'DETACHED'
+    onFail: OnFailStrategy
+  }) => {
+    try {
+      if (saveToСatalog) {
+        const op = await createOperationMutation.mutateAsync({ name, config })
+        if (binding === 'LINKED') {
+          await addStepMutation.mutateAsync({ stepKind: 'OPERATION_STEP', binding: 'LINKED', operationId: op.id, onFail })
+          toast({ title: 'Operation created and step linked', variant: 'success' })
+        } else {
+          await addStepMutation.mutateAsync({ stepKind: 'OPERATION_STEP', binding: 'DETACHED', sourceOperationId: op.id, onFail })
+          toast({ title: 'Operation created, step added as detached copy', variant: 'success' })
+        }
+      } else {
+        await addStepMutation.mutateAsync({ stepKind: 'OPERATION_STEP', binding: 'DETACHED', ownConfig: config, onFail })
+        toast({ title: 'Step added', variant: 'success' })
+      }
+    } catch (err) {
+      toast({ title: 'Failed to create step', description: String(err), variant: 'error' })
+      throw err
+    }
+  }, [createOperationMutation, addStepMutation, toast])
 
   const handleDeleteStep = useCallback(async (stepId: string) => {
     try {
@@ -342,6 +376,7 @@ export function FlowEditPage() {
         open={showAddDialog}
         onClose={() => setShowAddDialog(false)}
         onAdd={handleAddStep}
+        onCreateAndAdd={handleCreateAndAddStep}
         operations={operations}
         flows={allFlows}
         currentFlowId={activeFlowId}

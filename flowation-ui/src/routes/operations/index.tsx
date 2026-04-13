@@ -135,10 +135,10 @@ export function OperationsPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          Operations
+          Catalog
         </h1>
         <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-          Atomic steps: HTTP requests, SQL queries, assertions
+          Reusable operations: HTTP requests, SQL queries, assertions
         </p>
       </div>
 
@@ -170,7 +170,7 @@ export function OperationsPage() {
             className="h-7 w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-secondary)] pl-8 pr-3 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] transition-colors"
           />
         </div>
-        <Link to="/operations/new" className="ml-auto">
+        <Link to="/catalog/new" className="ml-auto">
           <Button size="sm">
             <Plus size={14} />
             New Operation
@@ -244,7 +244,7 @@ export function OperationsPage() {
                     >
                       <td className="px-4 py-2.5">
                         <Link
-                          to="/operations/$operationId"
+                          to="/catalog/$operationId"
                           params={{ operationId: op.id }}
                           className="text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors font-medium"
                         >
@@ -281,7 +281,7 @@ export function OperationsPage() {
                             <Play size={13} className="text-green-400" />
                           </Button>
                           <Link
-                            to="/operations/$operationId"
+                            to="/catalog/$operationId"
                             params={{ operationId: op.id }}
                           >
                             <Button variant="ghost" size="sm" title="Edit">
