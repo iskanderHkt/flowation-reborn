@@ -1,7 +1,7 @@
 package kg.ademity.flowation_api_modulith.shared.jdbc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kg.ademity.flowation_api_modulith.flow_module.operation.config.OperationConfig;
+import kg.ademity.flowation_api_modulith.catalog.config.OperationConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.postgresql.util.PGobject;

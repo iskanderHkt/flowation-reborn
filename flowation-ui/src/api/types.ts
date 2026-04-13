@@ -32,8 +32,6 @@ export type OperationConfig =
 
 export interface Operation {
   id: string
-  ownerId: string
-  groupId: string | null
   name: string
   type: OperationType
   configTemplate: OperationConfig
@@ -77,7 +75,6 @@ export type OnFailStrategy = 'STOP_FLOW' | 'SKIP_AND_CONTINUE'
 
 export interface Flow {
   id: string
-  ownerId: string
   name: string
   description: string | null
   createdAt: string
