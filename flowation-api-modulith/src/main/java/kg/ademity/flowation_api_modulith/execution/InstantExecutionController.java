@@ -1,11 +1,11 @@
 package kg.ademity.flowation_api_modulith.execution;
 
 import kg.ademity.flowation_api_modulith.execution.dto.ExecutionResultResponse;
+import kg.ademity.flowation_api_modulith.shared.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -23,7 +23,10 @@ public class InstantExecutionController {
     }
 
     @GetMapping("/{id}/executions")
-    public ResponseEntity<List<ExecutionResultResponse>> getHistory(@PathVariable UUID id) {
-        return ResponseEntity.ok(executionService.getHistory(id));
+    public ResponseEntity<PageResult<ExecutionResultResponse>> getHistory(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(executionService.getHistory(id, page, size));
     }
 }

@@ -53,7 +53,8 @@ public class AssertOperationExecutor implements OperationExecutor<AssertOperatio
             }
 
             String actual = VariableResolver.resolve(assert_.getExpression(), context);
-            boolean passed = evaluate(actual, comparator, expected);
+            String resolvedExpected = expected != null ? VariableResolver.resolve(expected, context) : null;
+            boolean passed = evaluate(actual, comparator, resolvedExpected);
             int durationMs = (int) (System.currentTimeMillis() - start);
 
             Map<String, Object> responseSnapshot = Map.of(
@@ -64,7 +65,7 @@ public class AssertOperationExecutor implements OperationExecutor<AssertOperatio
             if (passed) {
                 return StepResult.success(requestSnapshot, responseSnapshot, durationMs);
             } else {
-                String message = "Assertion failed: [%s] %s [%s]".formatted(actual, comparator, expected);
+                String message = "Assertion failed: [%s] %s [%s]".formatted(actual, comparator, resolvedExpected);
                 return StepResult.failure(requestSnapshot, responseSnapshot, message, durationMs);
             }
         } catch (Exception e) {

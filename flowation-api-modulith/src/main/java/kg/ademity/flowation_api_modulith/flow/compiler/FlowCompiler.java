@@ -48,8 +48,12 @@ public class FlowCompiler {
                 Flow nestedFlow = flowService.findById(flowStep.getNestedFlowId());
                 compileRecursive(nestedFlow, steps, depth + 1);
             } else {
-                OperationConfig config = resolveConfig(flowStep);
-                String operationName = resolveOperationName(flowStep);
+                // load operation once — used by both config resolution and name resolution
+                Operation operation = flowStep.getBinding() == Binding.LINKED
+                        ? operationService.findById(flowStep.getOperationId())
+                        : null;
+                OperationConfig config = resolveConfig(flowStep, operation);
+                String operationName = resolveOperationName(flowStep, operation);
                 List<ExtractionRule> rules = extractionRuleService.getRulesByStepId(flowStep.getId());
 
                 steps.add(new CompiledStep(
@@ -70,12 +74,15 @@ public class FlowCompiler {
         if (step.getStepKind() == StepKind.FLOW_STEP) {
             return Optional.empty();
         }
-        OperationConfig config = resolveConfig(step);
+        Operation operation = step.getBinding() == Binding.LINKED
+                ? operationService.findById(step.getOperationId())
+                : null;
+        OperationConfig config = resolveConfig(step, operation);
         List<ExtractionRule> rules = extractionRuleService.getRulesByStepId(step.getId());
         return Optional.of(new CompiledStep(
                 0,
                 step.getId(),
-                resolveOperationName(step),
+                resolveOperationName(step, operation),
                 config.type(),
                 config,
                 step.getOnFail(),
@@ -83,9 +90,8 @@ public class FlowCompiler {
         ));
     }
 
-    OperationConfig resolveConfig(FlowStep step) {
+    OperationConfig resolveConfig(FlowStep step, Operation operation) {
         if (step.getBinding() == Binding.LINKED) {
-            Operation operation = operationService.findById(step.getOperationId());
             if (step.getConfigOverride() != null) {
                 return OperationConfig.merge(operation.getConfigTemplate(), step.getConfigOverride());
             }
@@ -95,9 +101,9 @@ public class FlowCompiler {
         }
     }
 
-    private String resolveOperationName(FlowStep step) {
+    private String resolveOperationName(FlowStep step, Operation operation) {
         if (step.getBinding() == Binding.LINKED) {
-            return operationService.findById(step.getOperationId()).getName();
+            return operation.getName();
         }
         if (step.getSourceOperationId() != null) {
             return operationService.findById(step.getSourceOperationId()).getName() + " (detached)";

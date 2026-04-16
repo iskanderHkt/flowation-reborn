@@ -12,6 +12,7 @@ import type {
   ExtractionRuleUpdateRequest,
   FlowExecutionResult,
   StepResultResponse,
+  PageResult,
 } from './types.ts'
 
 export const flowsApi = {
@@ -66,8 +67,8 @@ export const flowsApi = {
       searchParams: environmentId ? { environmentId } : {},
     }).json<FlowExecutionResult>(),
 
-  getExecutions: (flowId: string) =>
-    api.get(`flows/${flowId}/executions`).json<FlowExecutionResult[]>(),
+  getExecutions: (flowId: string, page = 0, size = 20) =>
+    api.get(`flows/${flowId}/executions`, { searchParams: { page, size } }).json<PageResult<FlowExecutionResult>>(),
 
   testStep: (flowId: string, stepId: string) =>
     api.post(`flows/${flowId}/steps/${stepId}/test`).json<StepResultResponse>(),

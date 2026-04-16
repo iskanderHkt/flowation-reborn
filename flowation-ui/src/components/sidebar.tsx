@@ -21,7 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/flows', label: 'Flows', icon: GitBranch },
   { to: '/catalog', label: 'Catalog', icon: Zap },
   { to: '/environments', label: 'Environments', icon: Globe },
-  { to: '/batch', label: 'Batch', icon: Layers, disabled: true },
+  { to: '/batch', label: 'Batch', icon: Layers },
 ]
 
 export function Sidebar() {

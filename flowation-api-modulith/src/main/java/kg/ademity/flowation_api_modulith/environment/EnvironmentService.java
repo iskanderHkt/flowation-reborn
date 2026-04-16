@@ -64,6 +64,8 @@ public class EnvironmentService {
     }
 
     public void delete(UUID id) {
+        environmentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Environment", id));
         environmentRepository.deleteById(id);
     }
 

@@ -178,6 +178,89 @@ export interface UpsertVariablesRequest {
   variables: { key: string; value: string }[]
 }
 
+/* ── Pagination ───────────────────────────────────── */
+
+export interface PageResult<T> {
+  content: T[]
+  total: number
+  page: number
+  size: number
+}
+
+/* ── Batch Types ──────────────────────────────────── */
+
+export type BatchMode = 'MULTI' | 'DATA_DRIVEN'
+export type BatchItemType = 'FLOW' | 'OPERATION'
+export type BatchRunStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'PARTIAL' | 'FAILED'
+
+export interface BatchItemEntry {
+  id: string
+  itemType: BatchItemType
+  referenceId: string
+  itemOrder: number
+}
+
+export interface BatchDataRowEntry {
+  id: string
+  rowOrder: number
+  variables: Record<string, unknown>
+}
+
+export interface Batch {
+  id: string
+  name: string
+  mode: BatchMode
+  items: BatchItemEntry[]
+  dataRows: BatchDataRowEntry[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BatchCreateRequest {
+  name: string
+  mode: BatchMode
+}
+
+export interface BatchUpdateRequest {
+  name: string
+}
+
+export interface BatchItemRequest {
+  itemType: BatchItemType
+  referenceId: string
+}
+
+export interface SetBatchItemsRequest {
+  items: BatchItemRequest[]
+}
+
+export interface SetBatchDataRowsRequest {
+  rows: Record<string, unknown>[]
+}
+
+export interface BatchRunItemResult {
+  itemType: BatchItemType
+  referenceId: string
+  name: string
+  executionRunId: string
+  status: ExecutionStatus
+  durationMs: number | null
+}
+
+export interface BatchRun {
+  id: string
+  batchId: string
+  status: BatchRunStatus
+  startedAt: string | null
+  completedAt: string | null
+  items: BatchRunItemResult[]
+}
+
+export interface BatchStartResponse {
+  runId: string
+  batchId: string
+}
+
 /* ── Flow Execution Types ─────────────────────────── */
 
 export interface StepResultResponse {

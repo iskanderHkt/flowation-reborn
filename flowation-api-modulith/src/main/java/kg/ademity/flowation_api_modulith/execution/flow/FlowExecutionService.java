@@ -10,14 +10,18 @@ import kg.ademity.flowation_api_modulith.execution.port.EnvContextPort;
 import kg.ademity.flowation_api_modulith.execution.port.FlowPlanPort;
 import kg.ademity.flowation_api_modulith.execution.run.*;
 import kg.ademity.flowation_api_modulith.flow.compiler.CompiledStep;
+import kg.ademity.flowation_api_modulith.shared.PageResult;
 import kg.ademity.flowation_api_modulith.shared.TenantContext;
 import kg.ademity.flowation_api_modulith.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FlowExecutionService {
@@ -30,6 +34,10 @@ public class FlowExecutionService {
     private final TenantContext tenantContext;
 
     public FlowExecutionResultResponse execute(UUID flowId, UUID environmentId) {
+        return execute(flowId, environmentId, Map.of());
+    }
+
+    public FlowExecutionResultResponse execute(UUID flowId, UUID environmentId, Map<String, Object> inputVariables) {
         List<CompiledStep> compiledSteps = flowPlanPort.compilePlan(flowId);
 
         if (compiledSteps.isEmpty()) {
@@ -37,6 +45,7 @@ public class FlowExecutionService {
         }
 
         String flowName = flowPlanPort.getFlowName(flowId);
+        log.info("[FLOW] {} — starting ({} steps)", flowName, compiledSteps.size());
         Map<String, Object> executionPlan = buildExecutionPlan(flowId, flowName, compiledSteps);
 
         ExecutionRun run = runRepository.save(ExecutionRun.builder()
@@ -50,8 +59,9 @@ public class FlowExecutionService {
                 .createdAt(Instant.now())
                 .build());
 
-        // runtime context — pre-seeded with environment variables (if provided)
+        // runtime context — env variables as base, input variables override on top
         Map<String, Object> runtimeContext = new HashMap<>(envContextPort.loadContext(environmentId));
+        runtimeContext.putAll(inputVariables);
         List<ExecutionStepResult> stepResults = new ArrayList<>();
         ExecutionStatus overallStatus = ExecutionStatus.COMPLETED;
         boolean stopped = false;
@@ -95,6 +105,14 @@ public class FlowExecutionService {
                         .completedAt(stepEnd)
                         .build());
                 stepResults.add(savedStep);
+                if (result.status() == ExecutionStatus.COMPLETED) {
+                    log.info("[FLOW]   step[{}] {} → COMPLETED ({}ms)",
+                            compiledStep.stepIndex(), compiledStep.operationName(), result.durationMs());
+                } else {
+                    log.warn("[FLOW]   step[{}] {} → FAILED: {} | onFail={}",
+                            compiledStep.stepIndex(), compiledStep.operationName(),
+                            result.errorMessage(), compiledStep.onFail());
+                }
 
                 // apply extraction rules → write to runtime context
                 if (result.status() == ExecutionStatus.COMPLETED && result.responseSnapshot() != null) {
@@ -115,11 +133,18 @@ public class FlowExecutionService {
             }
         } catch (Exception e) {
             overallStatus = ExecutionStatus.FAILED;
+            log.error("[FLOW] {} — unexpected error: {}", flowName, e.getMessage());
         } finally {
-            // always finalize run — prevents stuck RUNNING status on unexpected errors
             run.setStatus(overallStatus);
             run.setCompletedAt(Instant.now());
             runRepository.save(run);
+        }
+
+        long durationMs = java.time.Duration.between(run.getStartedAt(), run.getCompletedAt()).toMillis();
+        if (overallStatus == ExecutionStatus.COMPLETED) {
+            log.info("[FLOW] {} → COMPLETED ({}ms)", flowName, durationMs);
+        } else {
+            log.warn("[FLOW] {} → FAILED ({}ms)", flowName, durationMs);
         }
 
         return toResponse(run, stepResults);
@@ -165,16 +190,21 @@ public class FlowExecutionService {
         );
     }
 
-    public List<FlowExecutionResultResponse> getHistory(UUID flowId) {
+    public PageResult<FlowExecutionResultResponse> getHistory(UUID flowId, int page, int size) {
         // validate flow exists
         flowPlanPort.getFlowName(flowId);
 
-        return runRepository.findAllByFlowIdOrderByCreatedAtDesc(flowId).stream()
+        var pageable = PageRequest.of(page, size);
+        List<FlowExecutionResultResponse> content = runRepository
+                .findAllByFlowIdOrderByCreatedAtDesc(flowId, pageable)
+                .stream()
                 .map(run -> {
                     List<ExecutionStepResult> steps = stepResultRepository.findAllByExecutionRunIdOrderByStepIndex(run.getId());
                     return toResponse(run, steps);
                 })
                 .toList();
+        long total = runRepository.countByFlowId(flowId);
+        return new PageResult<>(content, total, page, size);
     }
 
     private FlowExecutionResultResponse toResponse(ExecutionRun run, List<ExecutionStepResult> stepResults) {

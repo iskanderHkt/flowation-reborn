@@ -59,10 +59,10 @@ export function useExecuteOperation(operationId: string) {
   })
 }
 
-export function useExecutionHistory(operationId: string) {
+export function useExecutionHistory(operationId: string, page = 0, size = 20) {
   return useQuery({
-    queryKey: KEYS.executions(operationId),
-    queryFn: () => operationsApi.getExecutions(operationId),
+    queryKey: [...KEYS.executions(operationId), page, size],
+    queryFn: () => operationsApi.getExecutions(operationId, page, size),
     enabled: !!operationId,
   })
 }

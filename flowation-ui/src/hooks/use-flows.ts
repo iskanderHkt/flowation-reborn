@@ -175,10 +175,10 @@ export function useExecuteFlow(flowId: string) {
   })
 }
 
-export function useFlowExecutionHistory(flowId: string) {
+export function useFlowExecutionHistory(flowId: string, page = 0, size = 20) {
   return useQuery({
-    queryKey: KEYS.executions(flowId),
-    queryFn: () => flowsApi.getExecutions(flowId),
+    queryKey: [...KEYS.executions(flowId), page, size],
+    queryFn: () => flowsApi.getExecutions(flowId, page, size),
     enabled: !!flowId,
   })
 }

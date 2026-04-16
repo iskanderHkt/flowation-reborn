@@ -35,7 +35,8 @@ export function FlowEditPage() {
   const deleteStepMutation = useDeleteFlowStep(activeFlowId)
   const createOperationMutation = useCreateOperation()
   const executeMutation = useExecuteFlow(flowId)
-  const { data: executionHistory = [] } = useFlowExecutionHistory(flowId)
+  const { data: executionHistoryPage } = useFlowExecutionHistory(flowId)
+  const executionHistory = executionHistoryPage?.content ?? []
 
   const { data: environments = [] } = useEnvironments()
   const [selectedEnvId, setSelectedEnvId] = useState<string>('')

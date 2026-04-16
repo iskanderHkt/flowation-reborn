@@ -32,8 +32,9 @@ export function OperationEditPage() {
   const { data: operation, isLoading, error } = useOperation(operationId)
   const updateMutation = useUpdateOperation(operationId)
   const executeMutation = useExecuteOperation(operationId)
-  const { data: executionHistory = [], isLoading: historyLoading } =
+  const { data: executionHistoryPage, isLoading: historyLoading } =
     useExecutionHistory(operationId)
+  const executionHistory = executionHistoryPage?.content ?? []
 
   const { data: environments = [] } = useEnvironments()
   const [selectedEnvId, setSelectedEnvId] = useState<string>('')

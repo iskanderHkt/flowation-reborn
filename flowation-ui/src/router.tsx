@@ -15,6 +15,9 @@ import { FlowEditPage } from '@/routes/flows/edit.tsx'
 import { EnvironmentsPage } from '@/routes/environments/index.tsx'
 import { EnvironmentNewPage } from '@/routes/environments/new.tsx'
 import { EnvironmentEditPage } from '@/routes/environments/edit.tsx'
+import { BatchPage } from '@/routes/batch/index.tsx'
+import { BatchNewPage } from '@/routes/batch/new.tsx'
+import { BatchEditPage } from '@/routes/batch/edit.tsx'
 
 const rootRoute = createRootRoute({
   component: Layout,
@@ -118,6 +121,36 @@ const environmentEditRoute = createRoute({
   ),
 })
 
+const batchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/batch',
+  component: () => (
+    <ErrorBoundary>
+      <BatchPage />
+    </ErrorBoundary>
+  ),
+})
+
+const batchNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/batch/new',
+  component: () => (
+    <ErrorBoundary>
+      <BatchNewPage />
+    </ErrorBoundary>
+  ),
+})
+
+const batchEditRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/batch/$batchId',
+  component: () => (
+    <ErrorBoundary>
+      <BatchEditPage />
+    </ErrorBoundary>
+  ),
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   operationsRoute,
@@ -129,6 +162,9 @@ const routeTree = rootRoute.addChildren([
   environmentsRoute,
   environmentNewRoute,
   environmentEditRoute,
+  batchRoute,
+  batchNewRoute,
+  batchEditRoute,
 ])
 
 export const router = createRouter({ routeTree })

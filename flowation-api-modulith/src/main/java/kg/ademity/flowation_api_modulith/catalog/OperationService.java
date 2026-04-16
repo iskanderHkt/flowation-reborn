@@ -9,7 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -51,6 +54,12 @@ public class OperationService {
         operationFound.setUpdatedAt(Instant.now());
 
         return repository.save(operationFound);
+    }
+
+    public Map<UUID, String> resolveNames(Set<UUID> ids) {
+        Map<UUID, String> result = new HashMap<>();
+        repository.findAllById(ids).forEach(o -> result.put(o.getId(), o.getName()));
+        return result;
     }
 
     public void delete(UUID operationId) {

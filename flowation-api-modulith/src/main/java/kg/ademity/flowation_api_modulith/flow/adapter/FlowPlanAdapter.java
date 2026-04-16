@@ -12,7 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -32,6 +34,11 @@ public class FlowPlanAdapter implements FlowPlanPort {
     @Override
     public String getFlowName(UUID flowId) {
         return flowService.findById(flowId).getName();
+    }
+
+    @Override
+    public Map<UUID, String> getFlowNamesByIds(Set<UUID> ids) {
+        return flowService.resolveNames(ids);
     }
 
     @Override

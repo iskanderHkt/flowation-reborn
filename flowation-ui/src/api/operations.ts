@@ -4,6 +4,7 @@ import type {
   OperationCreateRequest,
   OperationUpdateRequest,
   ExecutionResult,
+  PageResult,
 } from './types.ts'
 
 export const operationsApi = {
@@ -24,6 +25,6 @@ export const operationsApi = {
       searchParams: environmentId ? { environmentId } : {},
     }).json<ExecutionResult>(),
 
-  getExecutions: (id: string) =>
-    api.get(`operations/${id}/executions`).json<ExecutionResult[]>(),
+  getExecutions: (id: string, page = 0, size = 20) =>
+    api.get(`operations/${id}/executions`, { searchParams: { page, size } }).json<PageResult<ExecutionResult>>(),
 }

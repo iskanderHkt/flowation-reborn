@@ -6,7 +6,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -42,6 +45,12 @@ public class FlowService {
         flowFound.setDescription(description);
 
         return flowRepository.save(flowFound);
+    }
+
+    public Map<UUID, String> resolveNames(Set<UUID> ids) {
+        Map<UUID, String> result = new HashMap<>();
+        flowRepository.findAllById(ids).forEach(f -> result.put(f.getId(), f.getName()));
+        return result;
     }
 
     public void delete(UUID id) {

@@ -3,7 +3,9 @@ package kg.ademity.flowation_api_modulith.execution.port;
 import kg.ademity.flowation_api_modulith.flow.compiler.CompiledStep;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface FlowPlanPort {
@@ -16,6 +18,8 @@ public interface FlowPlanPort {
     List<CompiledStep> compilePlan(UUID flowId);
 
     String getFlowName(UUID flowId);
+
+    Map<UUID, String> getFlowNamesByIds(Set<UUID> ids);
 
     /**
      * Compiles a single OPERATION_STEP. Returns empty if the step is a FLOW_STEP.

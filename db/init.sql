@@ -180,3 +180,54 @@ CREATE TABLE execution_step_results (
 );
 
 CREATE INDEX idx_exec_steps_run ON execution_step_results(execution_run_id);
+
+-- ============================================================
+-- Batch
+-- ============================================================
+
+CREATE TABLE batches (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id   UUID NOT NULL REFERENCES users(id),
+    name       VARCHAR(255) NOT NULL,
+    mode       VARCHAR(20) NOT NULL, -- MULTI | DATA_DRIVEN
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_batches_owner ON batches(owner_id);
+
+-- MULTI: N items (each runs once) | DATA_DRIVEN: exactly 1 item (runs per data row)
+CREATE TABLE batch_items (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id     UUID NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+    item_type    VARCHAR(20) NOT NULL, -- FLOW | OPERATION
+    reference_id UUID NOT NULL,        -- flow_id or operation_id (soft ref, no FK)
+    item_order   INTEGER NOT NULL,
+    UNIQUE (batch_id, item_order)
+);
+
+CREATE INDEX idx_batch_items_batch ON batch_items(batch_id);
+
+-- Only for DATA_DRIVEN mode: each row produces one parallel execution
+CREATE TABLE batch_data_rows (
+    id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id  UUID NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+    row_order INTEGER NOT NULL,
+    variables JSONB NOT NULL,          -- {"username": "alice", "password": "pass1"}
+    UNIQUE (batch_id, row_order)
+);
+
+CREATE INDEX idx_batch_data_rows_batch ON batch_data_rows(batch_id);
+
+CREATE TABLE batch_runs (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id     UUID NOT NULL REFERENCES batches(id) ON DELETE CASCADE,
+    owner_id     UUID NOT NULL REFERENCES users(id),
+    status       VARCHAR(20) NOT NULL,
+    started_at   TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_batch_runs_batch  ON batch_runs(batch_id);
+CREATE INDEX idx_batch_runs_status ON batch_runs(status);
