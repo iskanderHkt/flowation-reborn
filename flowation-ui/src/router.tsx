@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import {
   createRouter,
   createRootRoute,
@@ -6,18 +7,44 @@ import {
 } from '@tanstack/react-router'
 import { Layout } from '@/components/layout.tsx'
 import { ErrorBoundary } from '@/components/error-boundary.tsx'
+import { Skeleton } from '@/components/ui/skeleton.tsx'
+
+// Light routes — eagerly loaded
 import { OperationsPage } from '@/routes/operations/index.tsx'
 import { OperationNewPage } from '@/routes/operations/new.tsx'
-import { OperationEditPage } from '@/routes/operations/edit.tsx'
 import { FlowsPage } from '@/routes/flows/index.tsx'
 import { FlowNewPage } from '@/routes/flows/new.tsx'
-import { FlowEditPage } from '@/routes/flows/edit.tsx'
 import { EnvironmentsPage } from '@/routes/environments/index.tsx'
 import { EnvironmentNewPage } from '@/routes/environments/new.tsx'
 import { EnvironmentEditPage } from '@/routes/environments/edit.tsx'
 import { BatchPage } from '@/routes/batch/index.tsx'
 import { BatchNewPage } from '@/routes/batch/new.tsx'
-import { BatchEditPage } from '@/routes/batch/edit.tsx'
+import { ExecutionsPage } from '@/routes/executions/index.tsx'
+
+// Heavy routes — lazy loaded (CodeMirror + ReactFlow)
+const OperationEditPage = lazy(() =>
+  import('@/routes/operations/edit.tsx').then((m) => ({ default: m.OperationEditPage })),
+)
+const FlowEditPage = lazy(() =>
+  import('@/routes/flows/edit.tsx').then((m) => ({ default: m.FlowEditPage })),
+)
+const BatchEditPage = lazy(() =>
+  import('@/routes/batch/edit.tsx').then((m) => ({ default: m.BatchEditPage })),
+)
+
+function PageSkeleton() {
+  return (
+    <div className="p-6 flex flex-col gap-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-96" />
+      <div className="flex flex-col gap-3 mt-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-3/4" />
+      </div>
+    </div>
+  )
+}
 
 const rootRoute = createRootRoute({
   component: Layout,
@@ -56,7 +83,9 @@ const operationEditRoute = createRoute({
   path: '/catalog/$operationId',
   component: () => (
     <ErrorBoundary>
-      <OperationEditPage />
+      <Suspense fallback={<PageSkeleton />}>
+        <OperationEditPage />
+      </Suspense>
     </ErrorBoundary>
   ),
 })
@@ -86,7 +115,9 @@ const flowEditRoute = createRoute({
   path: '/flows/$flowId',
   component: () => (
     <ErrorBoundary>
-      <FlowEditPage />
+      <Suspense fallback={<PageSkeleton />}>
+        <FlowEditPage />
+      </Suspense>
     </ErrorBoundary>
   ),
 })
@@ -146,7 +177,19 @@ const batchEditRoute = createRoute({
   path: '/batch/$batchId',
   component: () => (
     <ErrorBoundary>
-      <BatchEditPage />
+      <Suspense fallback={<PageSkeleton />}>
+        <BatchEditPage />
+      </Suspense>
+    </ErrorBoundary>
+  ),
+})
+
+const executionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/executions',
+  component: () => (
+    <ErrorBoundary>
+      <ExecutionsPage />
     </ErrorBoundary>
   ),
 })
@@ -165,6 +208,7 @@ const routeTree = rootRoute.addChildren([
   batchRoute,
   batchNewRoute,
   batchEditRoute,
+  executionsRoute,
 ])
 
 export const router = createRouter({ routeTree })

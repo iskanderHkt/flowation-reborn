@@ -87,7 +87,8 @@ export function KeyValueEditor({
 
 /* ─── Helpers to convert between Record and pairs ─── */
 
-export function recordToPairs(record: Record<string, string>): KeyValuePair[] {
+export function recordToPairs(record: Record<string, string> | null | undefined): KeyValuePair[] {
+  if (!record) return []
   const entries = Object.entries(record)
   return entries.length > 0 ? entries.map(([key, value]) => ({ key, value })) : []
 }

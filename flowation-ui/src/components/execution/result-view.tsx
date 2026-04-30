@@ -8,7 +8,7 @@ import { AssertResultView } from './assert-result-view.tsx'
 
 export function ResultView({ result, compact }: { result: ExecutionResult; compact: boolean }) {
   const badge = STATUS_BADGE[result.status]
-  const req = result.requestSnapshot
+  const req = result.requestSnapshot ?? {}
   const res = result.responseSnapshot
   const isSql = 'query' in req && 'dbType' in req
   const isAssert = 'expression' in req && 'comparator' in req

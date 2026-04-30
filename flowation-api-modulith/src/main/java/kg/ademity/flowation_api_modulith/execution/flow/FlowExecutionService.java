@@ -239,6 +239,112 @@ public class FlowExecutionService {
         );
     }
 
+    public UUID startAsync(UUID flowId, UUID environmentId, Map<String, Object> inputVariables) {
+        List<CompiledStep> compiledSteps = flowPlanPort.compilePlan(flowId);
+
+        if (compiledSteps.isEmpty()) {
+            throw new ValidationException("Flow has no executable steps");
+        }
+
+        String flowName = flowPlanPort.getFlowName(flowId);
+        Map<String, Object> executionPlan = buildExecutionPlan(flowId, flowName, compiledSteps);
+
+        ExecutionRun run = runRepository.save(ExecutionRun.builder()
+                .ownerId(tenantContext.getOwnerId())
+                .runMode(RunMode.FLOW)
+                .status(ExecutionStatus.PENDING)
+                .flowId(flowId)
+                .environmentId(environmentId)
+                .executionPlan(executionPlan)
+                .createdAt(Instant.now())
+                .build());
+
+        Thread.ofVirtual().start(() -> runAsync(run, compiledSteps, flowName, environmentId, inputVariables));
+
+        return run.getId();
+    }
+
+    private void runAsync(ExecutionRun run, List<CompiledStep> compiledSteps,
+                          String flowName, UUID environmentId, Map<String, Object> inputVariables) {
+        run.setStatus(ExecutionStatus.RUNNING);
+        run.setStartedAt(Instant.now());
+        runRepository.save(run);
+
+        Map<String, Object> runtimeContext = new HashMap<>(envContextPort.loadContext(environmentId));
+        runtimeContext.putAll(inputVariables);
+        ExecutionStatus overallStatus = ExecutionStatus.COMPLETED;
+        boolean stopped = false;
+
+        log.info("[FLOW-ASYNC] {} — starting ({} steps)", flowName, compiledSteps.size());
+
+        try {
+            for (CompiledStep compiledStep : compiledSteps) {
+                if (stopped) {
+                    stepResultRepository.save(ExecutionStepResult.builder()
+                            .executionRunId(run.getId())
+                            .stepIndex(compiledStep.stepIndex())
+                            .stepRefId(compiledStep.stepRefId())
+                            .status(ExecutionStatus.SKIPPED)
+                            .startedAt(Instant.now())
+                            .completedAt(Instant.now())
+                            .build());
+                    continue;
+                }
+
+                OperationExecutor executor = executors.stream()
+                        .filter(e -> e.supports(compiledStep.operationType()))
+                        .findFirst()
+                        .orElseThrow(() -> new StepExecutionException(
+                                "No executor for type: " + compiledStep.operationType()));
+
+                Instant stepStart = Instant.now();
+                StepResult result = executor.executeRaw(compiledStep.mergedConfig(), runtimeContext);
+                Instant stepEnd = Instant.now();
+
+                stepResultRepository.save(ExecutionStepResult.builder()
+                        .executionRunId(run.getId())
+                        .stepIndex(compiledStep.stepIndex())
+                        .stepRefId(compiledStep.stepRefId())
+                        .status(result.status())
+                        .requestSnapshot(result.requestSnapshot())
+                        .responseSnapshot(result.responseSnapshot())
+                        .errorMessage(result.errorMessage())
+                        .durationMs(result.durationMs())
+                        .startedAt(stepStart)
+                        .completedAt(stepEnd)
+                        .build());
+
+                if (result.status() == ExecutionStatus.COMPLETED) {
+                    log.info("[FLOW-ASYNC]   step[{}] {} → COMPLETED ({}ms)",
+                            compiledStep.stepIndex(), compiledStep.operationName(), result.durationMs());
+                    if (result.responseSnapshot() != null) {
+                        for (var rule : compiledStep.extractionRules()) {
+                            Object extracted = JsonPathExtractor.extract(result.responseSnapshot(), rule.getSourcePath());
+                            runtimeContext.put(rule.getTargetVariable(), extracted != null ? extracted : AbsentValue.INSTANCE);
+                        }
+                    }
+                } else {
+                    log.warn("[FLOW-ASYNC]   step[{}] {} → FAILED: {} | onFail={}",
+                            compiledStep.stepIndex(), compiledStep.operationName(),
+                            result.errorMessage(), compiledStep.onFail());
+                    overallStatus = ExecutionStatus.FAILED;
+                    if (compiledStep.onFail().name().equals("STOP_FLOW")) {
+                        stopped = true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            overallStatus = ExecutionStatus.FAILED;
+            log.error("[FLOW-ASYNC] {} — unexpected error: {}", flowName, e.getMessage(), e);
+        } finally {
+            run.setStatus(overallStatus);
+            run.setCompletedAt(Instant.now());
+            runRepository.save(run);
+            log.info("[FLOW-ASYNC] {} → {} ({}ms)", flowName, overallStatus,
+                    java.time.Duration.between(run.getStartedAt(), run.getCompletedAt()).toMillis());
+        }
+    }
+
     private Map<String, Object> buildExecutionPlan(UUID flowId, String flowName, List<CompiledStep> steps) {
         List<Map<String, Object>> stepSnapshots = steps.stream()
                 .map(s -> Map.<String, Object>of(

@@ -28,7 +28,8 @@ interface QuickRunDrawerProps {
 export function QuickRunDrawer({ operation, onClose }: QuickRunDrawerProps) {
   const operationId = operation?.id ?? ''
   const executeMutation = useExecuteOperation(operationId)
-  const { data: history = [], isLoading: historyLoading } = useExecutionHistory(operationId)
+  const { data: historyPage, isLoading: historyLoading } = useExecutionHistory(operationId)
+  const history = historyPage?.content ?? []
 
   const [lastResult, setLastResult] = useState<ExecutionResult | null>(null)
   const [width, setWidth] = useState(DRAWER_DEFAULT_W)
@@ -108,7 +109,7 @@ export function QuickRunDrawer({ operation, onClose }: QuickRunDrawerProps) {
               </div>
               <div className="flex items-center gap-1.5">
                 <Link
-                  to="/operations/$operationId"
+                  to="/catalog/$operationId"
                   params={{ operationId: operation.id }}
                 >
                   <Button variant="ghost" size="sm" title="Edit operation">

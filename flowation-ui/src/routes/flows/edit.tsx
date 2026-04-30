@@ -35,11 +35,18 @@ export function FlowEditPage() {
   const deleteStepMutation = useDeleteFlowStep(activeFlowId)
   const createOperationMutation = useCreateOperation()
   const executeMutation = useExecuteFlow(flowId)
-  const { data: executionHistoryPage } = useFlowExecutionHistory(flowId)
-  const executionHistory = executionHistoryPage?.content ?? []
+  const [historyPageIndex, setHistoryPageIndex] = useState(0)
+  const { data: executionHistoryPage } = useFlowExecutionHistory(flowId, historyPageIndex)
 
   const { data: environments = [] } = useEnvironments()
-  const [selectedEnvId, setSelectedEnvId] = useState<string>('')
+  const lsKey = `flowation:env:flow:${flowId}`
+  const [selectedEnvId, setSelectedEnvIdRaw] = useState<string>(
+    () => localStorage.getItem(lsKey) ?? '',
+  )
+  const setSelectedEnvId = (id: string) => {
+    localStorage.setItem(lsKey, id)
+    setSelectedEnvIdRaw(id)
+  }
 
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
   const [selectedStepFlowId, setSelectedStepFlowId] = useState<string | null>(null)
@@ -58,7 +65,7 @@ export function FlowEditPage() {
   const [varsPanelOpen, setVarsPanelOpen] = useState(true)
 
   // Latest execution result for status coloring
-  const latestExecution = executionHistory[0] as FlowExecutionResult | undefined
+  const latestExecution = executionHistoryPage?.content[0] as FlowExecutionResult | undefined
 
   const executionStatuses = useMemo(() => {
     if (!latestExecution) return {}
@@ -366,7 +373,9 @@ export function FlowEditPage() {
           />
           <FlowExecutionPanel
             latestResult={latestExecution}
-            history={executionHistory}
+            historyPage={executionHistoryPage}
+            historyPageIndex={historyPageIndex}
+            onHistoryPageChange={setHistoryPageIndex}
             onStepClick={(stepRefId) => setSelectedStepId(stepRefId)}
           />
         </div>

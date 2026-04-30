@@ -22,12 +22,13 @@ public class OperationService {
     private final OperationUsagePort operationUsagePort;
     private final TenantContext tenantContext;
 
-    public Operation create(String name, OperationConfig config) {
+    public Operation create(String name, OperationConfig config, UUID groupId) {
         Operation operationToCreate = Operation.builder()
                 .ownerId(tenantContext.getOwnerId())
                 .name(name)
                 .type(config.type())
                 .configTemplate(config)
+                .groupId(groupId)
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
@@ -37,20 +38,21 @@ public class OperationService {
 
     public Operation findById(UUID operationId) {
 
-        return repository.findById(operationId)
+        return repository.findByIdAndDeletedAtIsNull(operationId)
                 .orElseThrow(() -> new NotFoundException("Operation", operationId));
     }
 
     public List<Operation> findAll() {
-        return repository.findAllByOwnerId(tenantContext.getOwnerId());
+        return repository.findAllByOwnerIdAndDeletedAtIsNull(tenantContext.getOwnerId());
     }
 
-    public Operation update(UUID operationId, String name, OperationConfig config) {
-        Operation operationFound = repository.findById(operationId)
+    public Operation update(UUID operationId, String name, OperationConfig config, UUID groupId) {
+        Operation operationFound = repository.findByIdAndDeletedAtIsNull(operationId)
                 .orElseThrow(() -> new NotFoundException("Operation", operationId));
 
         operationFound.setName(name);
         operationFound.setConfigTemplate(config);
+        operationFound.setGroupId(groupId);
         operationFound.setUpdatedAt(Instant.now());
 
         return repository.save(operationFound);
@@ -63,6 +65,9 @@ public class OperationService {
     }
 
     public void delete(UUID operationId) {
+        Operation operation = repository.findByIdAndDeletedAtIsNull(operationId)
+                .orElseThrow(() -> new NotFoundException("Operation", operationId));
+
         List<String> linkedFlowNames = operationUsagePort.findLinkedFlowNames(operationId);
 
         if (!linkedFlowNames.isEmpty()) {
@@ -70,6 +75,7 @@ public class OperationService {
                     "Cannot delete operation: linked in flows: " + String.join(", ", linkedFlowNames));
         }
 
-        repository.deleteById(operationId);
+        operation.setDeletedAt(Instant.now());
+        repository.save(operation);
     }
 }

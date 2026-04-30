@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Tabs } from '@/components/ui/tabs.tsx'
+import { HistoryPagination } from '@/components/ui/history-pagination.tsx'
 import { ChevronDown, ChevronRight, Clock, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/cn.ts'
 import { HttpResultView } from '@/components/execution/http-result-view.tsx'
 import { SqlResultView } from '@/components/execution/sql-result-view.tsx'
 import { AssertResultView } from '@/components/execution/assert-result-view.tsx'
-import type { FlowExecutionResult, StepResultResponse, ExecutionStatus } from '@/api/types.ts'
+import type { FlowExecutionResult, StepResultResponse, ExecutionStatus, PageResult } from '@/api/types.ts'
 
 const STATUS_VARIANT: Record<ExecutionStatus, 'success' | 'error' | 'muted' | 'warning' | 'info'> = {
   COMPLETED: 'success',
@@ -26,19 +27,22 @@ const STATUS_STRIPE: Record<ExecutionStatus, string> = {
 
 interface FlowExecutionPanelProps {
   latestResult: FlowExecutionResult | undefined
-  history: FlowExecutionResult[]
+  historyPage: PageResult<FlowExecutionResult> | undefined
+  historyPageIndex: number
+  onHistoryPageChange: (page: number) => void
   onStepClick?: (stepRefId: string) => void
 }
 
-export function FlowExecutionPanel({ latestResult, history, onStepClick }: FlowExecutionPanelProps) {
+export function FlowExecutionPanel({ latestResult, historyPage, historyPageIndex, onHistoryPageChange, onStepClick }: FlowExecutionPanelProps) {
   const [activeTab, setActiveTab] = useState('result')
+  const history = historyPage?.content ?? []
 
   return (
     <div className="flex flex-col h-full">
       <Tabs
         tabs={[
           { id: 'result', label: 'Result' },
-          { id: 'history', label: `History (${history.length})` },
+          { id: 'history', label: `History (${historyPage?.total ?? 0})` },
         ]}
         activeTab={activeTab}
         onChange={setActiveTab}
@@ -57,6 +61,15 @@ export function FlowExecutionPanel({ latestResult, history, onStepClick }: FlowE
           <HistoryList history={history} onStepClick={onStepClick} />
         )}
       </div>
+
+      {activeTab === 'history' && historyPage && (
+        <HistoryPagination
+          page={historyPageIndex}
+          total={historyPage.total}
+          size={historyPage.size}
+          onChange={onHistoryPageChange}
+        />
+      )}
     </div>
   )
 }

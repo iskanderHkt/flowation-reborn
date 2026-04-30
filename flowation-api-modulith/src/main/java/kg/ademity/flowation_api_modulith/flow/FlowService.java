@@ -29,16 +29,16 @@ public class FlowService {
     }
 
     public Flow findById(UUID id) {
-        return flowRepository.findById(id)
+        return flowRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Flow", id));
     }
 
     public List<Flow> findAll() {
-        return flowRepository.findAllByOwnerId(tenantContext.getOwnerId());
+        return flowRepository.findAllByOwnerIdAndDeletedAtIsNull(tenantContext.getOwnerId());
     }
 
     public Flow update(UUID id, String name, String description) {
-        Flow flowFound = flowRepository.findById(id)
+        Flow flowFound = flowRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Flow", id));
 
         flowFound.setName(name);
@@ -54,8 +54,10 @@ public class FlowService {
     }
 
     public void delete(UUID id) {
-        flowRepository.deleteById(id);
+        Flow flow = flowRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new NotFoundException("Flow", id));
+        flow.setDeletedAt(Instant.now());
+        flowRepository.save(flow);
     }
 
 }
-

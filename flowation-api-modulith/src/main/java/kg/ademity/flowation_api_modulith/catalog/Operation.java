@@ -24,4 +24,5 @@ public class Operation {
     private OperationConfig configTemplate;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant deletedAt;
 }

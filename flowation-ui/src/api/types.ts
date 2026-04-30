@@ -9,6 +9,7 @@ export interface HttpOperationConfig {
   headers: Record<string, string>
   body?: string
   timeoutMs?: number
+  failOnHttpError?: boolean
 }
 
 export interface SqlOperationConfig {
@@ -35,6 +36,7 @@ export interface Operation {
   name: string
   type: OperationType
   configTemplate: OperationConfig
+  groupId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -42,11 +44,29 @@ export interface Operation {
 export interface OperationCreateRequest {
   name: string
   config: OperationConfig
+  groupId?: string | null
 }
 
 export interface OperationUpdateRequest {
   name: string
   config: OperationConfig
+  groupId?: string | null
+}
+
+/* ── Operation Group Types ────────────────────────── */
+
+export interface OperationGroup {
+  id: string
+  name: string
+  createdAt: string
+}
+
+export interface OperationGroupCreateRequest {
+  name: string
+}
+
+export interface OperationGroupUpdateRequest {
+  name: string
 }
 
 /* ── Execution Types ────────────────────────────────── */

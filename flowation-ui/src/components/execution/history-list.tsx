@@ -14,8 +14,8 @@ export function HistoryList({ history }: { history: ExecutionResult[] }) {
       {history.map((r) => {
         const badge = STATUS_BADGE[r.status]
         const isOpen = expanded === r.runId
-        const isSql = 'query' in r.requestSnapshot
-        const method = r.requestSnapshot.method as string | undefined
+        const isSql = r.requestSnapshot != null && 'query' in r.requestSnapshot
+        const method = r.requestSnapshot?.method as string | undefined
         const status = r.responseSnapshot?.status as number | undefined
 
         return (

@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Tabs } from '@/components/ui/tabs.tsx'
 import { useToast } from '@/components/ui/toast.tsx'
-import { ArrowLeft, Plus, Trash2, Play, X, Check, GitBranch, Zap } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Play, X, Check, GitBranch, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import type { BatchItemType, BatchRunStatus, BatchItemRequest, BatchRun } from '@/api/types.ts'
 import { cn } from '@/lib/cn.ts'
@@ -359,14 +359,39 @@ function RunHistory({
   activeRunId: string | null
   onSelect: (runId: string) => void
 }) {
-  const { data: runsPage } = useBatchRuns(batchId)
+  const [page, setPage] = useState(0)
+  const { data: runsPage } = useBatchRuns(batchId, page)
   const runs = runsPage?.content ?? []
+  const totalPages = runsPage ? Math.max(1, Math.ceil(runsPage.total / runsPage.size)) : 1
 
-  if (!runs.length) return null
+  if (!runs.length && page === 0) return null
 
   return (
     <div className="mt-4">
-      <p className="text-xs font-medium text-[var(--color-text-secondary)] mb-2">History</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium text-[var(--color-text-secondary)]">
+          History {runsPage && runsPage.total > 0 ? `(${runsPage.total})` : ''}
+        </p>
+        {runsPage && runsPage.total > runsPage.size && (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className={cn('p-0.5 rounded transition-colors', page === 0 ? 'opacity-30 cursor-default' : 'hover:bg-[var(--color-bg-elevated)] cursor-pointer')}
+            >
+              <ChevronLeft size={12} />
+            </button>
+            <span className="text-[10px] text-[var(--color-text-muted)] px-1">{page + 1}/{totalPages}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className={cn('p-0.5 rounded transition-colors', page >= totalPages - 1 ? 'opacity-30 cursor-default' : 'hover:bg-[var(--color-bg-elevated)] cursor-pointer')}
+            >
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        )}
+      </div>
       <div className="space-y-1.5">
         {runs.map((run) => {
           const badge = RUN_STATUS_BADGE[run.status]

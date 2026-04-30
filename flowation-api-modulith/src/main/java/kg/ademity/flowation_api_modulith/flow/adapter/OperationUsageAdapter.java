@@ -26,9 +26,9 @@ public class OperationUsageAdapter implements OperationUsagePort {
                 .stream()
                 .map(FlowStep::getFlowId)
                 .distinct()
-                .map(flowId -> flowRepository.findById(flowId)
-                        .map(Flow::getName)
-                        .orElse("Unknown flow"))
+                .map(flowRepository::findByIdAndDeletedAtIsNull)
+                .flatMap(java.util.Optional::stream)
+                .map(Flow::getName)
                 .toList();
     }
 }

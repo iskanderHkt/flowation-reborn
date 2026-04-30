@@ -114,6 +114,11 @@ public class HttpOperationExecutor implements OperationExecutor<HttpOperationCon
                 responseSnapshot.put("body", response.body());
             }
 
+            if (http.isFailOnHttpError() && response.statusCode() >= 400) {
+                return StepResult.failure(requestSnapshot, responseSnapshot,
+                        "HTTP " + response.statusCode(), durationMs);
+            }
+
             return StepResult.success(requestSnapshot, responseSnapshot, durationMs);
         } catch (Exception e) {
             int durationMs = (int) (System.currentTimeMillis() - start);

@@ -21,4 +21,5 @@ public class Flow {
     private String description;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant deletedAt;
 }

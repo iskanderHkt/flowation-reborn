@@ -29,12 +29,12 @@ public class OperationController {
 
     @PostMapping
     public ResponseEntity<OperationResponse> create(@RequestBody OperationCreateRequest request) {
-        return ResponseEntity.status(201).body(OperationResponse.from(service.create(request.name(), request.config())));
+        return ResponseEntity.status(201).body(OperationResponse.from(service.create(request.name(), request.config(), request.groupId())));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<OperationResponse> update(@PathVariable UUID id, @RequestBody OperationUpdateRequest request) {
-        return ResponseEntity.ok(OperationResponse.from(service.update(id, request.name(), request.config())));
+        return ResponseEntity.ok(OperationResponse.from(service.update(id, request.name(), request.config(), request.groupId())));
     }
 
     @DeleteMapping("/{id}")

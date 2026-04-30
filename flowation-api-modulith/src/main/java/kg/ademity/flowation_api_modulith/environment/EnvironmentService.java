@@ -33,14 +33,14 @@ public class EnvironmentService {
     }
 
     public EnvironmentResponse findById(UUID id) {
-        Environment env = environmentRepository.findById(id)
+        Environment env = environmentRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Environment", id));
         List<EnvVariable> variables = envVariableRepository.findAllByEnvironmentId(id);
         return toResponse(env, variables);
     }
 
     public List<EnvironmentResponse> findAll() {
-        List<Environment> envs = environmentRepository.findAllByOwnerId(tenantContext.getOwnerId());
+        List<Environment> envs = environmentRepository.findAllByOwnerIdAndDeletedAtIsNull(tenantContext.getOwnerId());
         if (envs.isEmpty()) return List.of();
 
         List<UUID> envIds = envs.stream().map(Environment::getId).toList();
@@ -54,7 +54,7 @@ public class EnvironmentService {
     }
 
     public EnvironmentResponse update(UUID id, String name) {
-        Environment env = environmentRepository.findById(id)
+        Environment env = environmentRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Environment", id));
         env.setName(name);
         env.setUpdatedAt(Instant.now());
@@ -64,14 +64,15 @@ public class EnvironmentService {
     }
 
     public void delete(UUID id) {
-        environmentRepository.findById(id)
+        Environment env = environmentRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Environment", id));
-        environmentRepository.deleteById(id);
+        env.setDeletedAt(Instant.now());
+        environmentRepository.save(env);
     }
 
     @Transactional
     public EnvironmentResponse upsertVariables(UUID id, List<UpsertVariablesRequest.EnvVariableEntry> entries) {
-        Environment env = environmentRepository.findById(id)
+        Environment env = environmentRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Environment", id));
 
         envVariableRepository.deleteAllByEnvironmentId(id);

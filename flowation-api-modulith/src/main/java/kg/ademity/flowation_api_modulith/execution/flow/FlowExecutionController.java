@@ -1,5 +1,7 @@
 package kg.ademity.flowation_api_modulith.execution.flow;
 
+import kg.ademity.flowation_api_modulith.execution.dto.AsyncExecutionRequest;
+import kg.ademity.flowation_api_modulith.execution.dto.ExecutionStartResponse;
 import kg.ademity.flowation_api_modulith.execution.dto.FlowExecutionResultResponse;
 import kg.ademity.flowation_api_modulith.execution.dto.StepResultResponse;
 import kg.ademity.flowation_api_modulith.shared.PageResult;
@@ -21,6 +23,14 @@ public class FlowExecutionController {
             @PathVariable UUID id,
             @RequestParam(required = false) UUID environmentId) {
         return ResponseEntity.ok(service.execute(id, environmentId));
+    }
+
+    @PostMapping("/{flowId}/runs")
+    public ResponseEntity<ExecutionStartResponse> startRun(
+            @PathVariable UUID flowId,
+            @RequestBody AsyncExecutionRequest request) {
+        UUID runId = service.startAsync(flowId, request.environmentId(), request.inputVariables());
+        return ResponseEntity.accepted().body(new ExecutionStartResponse(runId));
     }
 
     @GetMapping("/{id}/executions")

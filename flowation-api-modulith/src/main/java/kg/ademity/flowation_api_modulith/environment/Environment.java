@@ -20,4 +20,5 @@ public class Environment {
     private String name;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant deletedAt;
 }

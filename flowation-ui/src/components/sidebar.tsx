@@ -5,10 +5,11 @@ import {
   GitBranch,
   Globe,
   Layers,
+  History,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useUIStore } from '@/shared/stores/ui-store.ts'
 
 interface NavItem {
   to: string
@@ -22,10 +23,12 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/catalog', label: 'Catalog', icon: Zap },
   { to: '/environments', label: 'Environments', icon: Globe },
   { to: '/batch', label: 'Batch', icon: Layers },
+  { to: '/executions', label: 'Executions', icon: History },
 ]
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  const collapsed = useUIStore((s) => s.sidebarCollapsed)
+  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed)
   const routerState = useRouterState()
   const navigate = useNavigate()
   const currentPath = routerState.location.pathname
@@ -79,7 +82,7 @@ export function Sidebar() {
 
       {/* Collapse toggle */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={() => setSidebarCollapsed(!collapsed)}
         className="flex items-center justify-center h-10 border-t border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors cursor-pointer"
       >
         {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}

@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input.tsx'
 import { Select } from '@/components/ui/select.tsx'
 import { CodeEditor } from '@/components/code-editor.tsx'
 import { KeyValueEditor, recordToPairs, pairsToRecord } from '@/components/key-value-editor.tsx'
-import type { OperationConfig, OperationType } from '@/api/types.ts'
+import type { OperationConfig, OperationType, OperationGroup } from '@/api/types.ts'
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(
   (m) => ({ value: m, label: m }),
@@ -36,7 +36,7 @@ const OP_TYPES: { value: OperationType; label: string }[] = [
 function defaultConfig(type: OperationType): OperationConfig {
   switch (type) {
     case 'HTTP_REQUEST':
-      return { type: 'HTTP_REQUEST', method: 'GET', url: '', headers: {}, body: '', timeoutMs: 5000 }
+      return { type: 'HTTP_REQUEST', method: 'GET', url: '', headers: {}, body: '', timeoutMs: 5000, failOnHttpError: false }
     case 'SQL_QUERY':
       return { type: 'SQL_QUERY', dbType: 'POSTGRES', connectionString: '', query: '' }
     case 'ASSERTION':
@@ -55,6 +55,9 @@ interface OperationFormProps {
   onNameChange: (name: string) => void
   onConfigChange: (config: OperationConfig) => void
   onTypeChange?: (type: OperationType) => void
+  groupId?: string | null
+  onGroupIdChange?: (id: string | null) => void
+  groups?: OperationGroup[]
   isNew?: boolean
   hideName?: boolean
   validationErrors?: Record<string, string> | null
@@ -66,6 +69,9 @@ export function OperationForm({
   onNameChange,
   onConfigChange,
   onTypeChange,
+  groupId,
+  onGroupIdChange,
+  groups,
   isNew = false,
   hideName = false,
   validationErrors,
@@ -88,6 +94,19 @@ export function OperationForm({
             />
             <FieldError error={validationErrors?.['name']} />
           </div>
+          {groups !== undefined && onGroupIdChange && (
+            <div className="w-44">
+              <Select
+                label="Group"
+                value={groupId ?? ''}
+                options={[
+                  { value: '', label: '— No group —' },
+                  ...groups.map((g) => ({ value: g.id, label: g.name })),
+                ]}
+                onChange={(e) => onGroupIdChange(e.target.value || null)}
+              />
+            </div>
+          )}
           {isNew && (
             <div className="w-44">
               <Select
@@ -177,6 +196,18 @@ function HttpConfigForm({
           />
         </div>
       </div>
+
+      <label className="flex items-center gap-2 cursor-pointer self-start">
+        <input
+          type="checkbox"
+          checked={config.failOnHttpError ?? false}
+          onChange={(e) => set({ failOnHttpError: e.target.checked })}
+          className="w-3.5 h-3.5 rounded accent-[var(--color-accent)] cursor-pointer"
+        />
+        <span className="text-xs text-[var(--color-text-secondary)]">
+          Fail step on 4xx / 5xx response
+        </span>
+      </label>
 
       <div>
         <label className="text-xs font-medium text-[var(--color-text-secondary)] mb-1.5 block">

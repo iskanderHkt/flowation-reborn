@@ -24,6 +24,7 @@ public sealed interface OperationConfig permits HttpOperationConfig, SqlOperatio
                 merged.setUrl(o.getUrl() != null ? o.getUrl() : b.getUrl());
                 merged.setBody(o.getBody() != null ? o.getBody() : b.getBody());
                 merged.setTimeoutMs(o.getTimeoutMs() != null ? o.getTimeoutMs() : b.getTimeoutMs());
+                merged.setFailOnHttpError(o.isFailOnHttpError() || b.isFailOnHttpError());
 
                 if (b.getHeaders() != null || o.getHeaders() != null) {
                     java.util.Map<String, String> headers = new java.util.HashMap<>();

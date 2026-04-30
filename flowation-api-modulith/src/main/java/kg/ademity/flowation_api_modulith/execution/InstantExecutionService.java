@@ -115,6 +115,74 @@ public class InstantExecutionService {
         );
     }
 
+    public UUID startAsync(UUID operationId, UUID environmentId, Map<String, Object> inputVariables) {
+        Operation operation = operationPort.findById(operationId);
+
+        ExecutionRun run = executionRunRepository.save(ExecutionRun.builder()
+                .ownerId(tenantContext.getOwnerId())
+                .runMode(RunMode.INSTANT)
+                .status(ExecutionStatus.PENDING)
+                .operationId(operationId)
+                .environmentId(environmentId)
+                .executionPlan(Map.of("operationId", operationId.toString(), "operationName", operation.getName()))
+                .createdAt(Instant.now())
+                .build());
+
+        Thread.ofVirtual().start(() -> runAsync(run, operation, environmentId, inputVariables));
+
+        return run.getId();
+    }
+
+    private void runAsync(ExecutionRun run, Operation operation, UUID environmentId, Map<String, Object> inputVariables) {
+        run.setStatus(ExecutionStatus.RUNNING);
+        run.setStartedAt(Instant.now());
+        executionRunRepository.save(run);
+
+        OperationExecutor executor = executors.stream()
+                .filter(e -> e.supports(operation.getType()))
+                .findFirst()
+                .orElseThrow(() -> new StepExecutionException("No executor found for type: " + operation.getType()));
+
+        Map<String, Object> context = new HashMap<>(envContextPort.loadContext(environmentId));
+        context.putAll(inputVariables);
+
+        ExecutionStatus finalStatus = ExecutionStatus.FAILED;
+
+        try {
+            StepResult stepResult = executor.executeRaw(operation.getConfigTemplate(), context);
+            Instant completedAt = Instant.now();
+
+            stepResultRepository.save(ExecutionStepResult.builder()
+                    .executionRunId(run.getId())
+                    .stepIndex(0)
+                    .status(stepResult.status())
+                    .requestSnapshot(stepResult.requestSnapshot())
+                    .responseSnapshot(stepResult.responseSnapshot())
+                    .errorMessage(stepResult.errorMessage())
+                    .durationMs(stepResult.durationMs())
+                    .startedAt(run.getStartedAt())
+                    .completedAt(completedAt)
+                    .build());
+
+            finalStatus = stepResult.status() == ExecutionStatus.COMPLETED
+                    ? ExecutionStatus.COMPLETED : ExecutionStatus.FAILED;
+
+            if (finalStatus == ExecutionStatus.COMPLETED) {
+                log.info("[INSTANT-ASYNC] {} ({}) → COMPLETED ({}ms)",
+                        operation.getName(), operation.getType(), stepResult.durationMs());
+            } else {
+                log.warn("[INSTANT-ASYNC] {} ({}) → FAILED: {}",
+                        operation.getName(), operation.getType(), stepResult.errorMessage());
+            }
+        } catch (Exception e) {
+            log.error("[INSTANT-ASYNC] {} — unexpected error: {}", operation.getName(), e.getMessage(), e);
+        } finally {
+            run.setStatus(finalStatus);
+            run.setCompletedAt(Instant.now());
+            executionRunRepository.save(run);
+        }
+    }
+
     public PageResult<ExecutionResultResponse> getHistory(UUID operationId, int page, int size) {
         var pageable = PageRequest.of(page, size);
         List<ExecutionResultResponse> content = executionRunRepository

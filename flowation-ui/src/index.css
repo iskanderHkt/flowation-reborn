@@ -35,6 +35,29 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+
+  /* shadcn/ui semantic aliases — map to project tokens above.
+     These enable Tailwind utilities: bg-background, text-foreground,
+     bg-primary, text-muted-foreground, bg-popover, etc.
+     NOTE: --color-accent intentionally omitted — conflicts with brand violet.
+     Use bg-[var(--color-bg-hover)] for hover/surface accent in new components. */
+  --color-background: #0a0a0f;
+  --color-foreground: #e8e8f0;
+  --color-card: #12121a;
+  --color-card-foreground: #e8e8f0;
+  --color-popover: #22223a;
+  --color-popover-foreground: #e8e8f0;
+  --color-primary: #8b5cf6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1a1a27;
+  --color-secondary-foreground: #e8e8f0;
+  --color-muted: #1a1a27;
+  --color-muted-foreground: #6b6b88;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-input: #2e2e48;
+  --color-ring: #8b5cf6;
+  --radius: 6px;
 }
 
 * {
@@ -68,6 +91,48 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* Radix UI animation utilities */
+@keyframes radix-overlay-show {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes radix-overlay-hide {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes radix-content-show {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes radix-content-hide {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+}
+@keyframes radix-slide-up-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes radix-slide-down-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes radix-slide-left-fade {
+  from { opacity: 0; transform: translateX(4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes radix-slide-right-fade {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes radix-accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes radix-accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
 }
 
 /* CodeMirror theme overrides */

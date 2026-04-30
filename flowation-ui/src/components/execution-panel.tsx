@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Spinner } from '@/components/ui/spinner.tsx'
+import { HistoryPagination } from '@/components/ui/history-pagination.tsx'
 import { cn } from '@/lib/cn.ts'
-import type { ExecutionResult } from '@/api/types.ts'
+import type { ExecutionResult, PageResult } from '@/api/types.ts'
 import { ResultView } from './execution/result-view.tsx'
 import { HistoryList } from './execution/history-list.tsx'
 
@@ -12,18 +13,23 @@ export { ResultView } from './execution/result-view.tsx'
 
 interface ExecutionPanelProps {
   result: ExecutionResult | null
-  history: ExecutionResult[]
+  historyPage: PageResult<ExecutionResult> | undefined
   isExecuting: boolean
   isLoadingHistory: boolean
+  historyPageIndex: number
+  onHistoryPageChange: (page: number) => void
 }
 
 export function ExecutionPanel({
   result,
-  history,
+  historyPage,
   isExecuting,
   isLoadingHistory,
+  historyPageIndex,
+  onHistoryPageChange,
 }: ExecutionPanelProps) {
   const [tab, setTab] = useState<'result' | 'history'>('result')
+  const history = historyPage?.content ?? []
 
   return (
     <div className="flex flex-col h-full border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
@@ -32,7 +38,7 @@ export function ExecutionPanel({
           Result
         </TabBtn>
         <TabBtn active={tab === 'history'} onClick={() => setTab('history')}>
-          History ({history.length})
+          History ({historyPage?.total ?? 0})
         </TabBtn>
       </div>
 
@@ -61,6 +67,15 @@ export function ExecutionPanel({
           <HistoryList history={history} />
         )}
       </div>
+
+      {tab === 'history' && historyPage && (
+        <HistoryPagination
+          page={historyPageIndex}
+          total={historyPage.total}
+          size={historyPage.size}
+          onChange={onHistoryPageChange}
+        />
+      )}
     </div>
   )
 }

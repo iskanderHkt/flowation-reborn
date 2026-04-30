@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
+import { useForm } from '@tanstack/react-form'
 import {
   useOperation,
   useUpdateOperation,
   useExecuteOperation,
   useExecutionHistory,
-} from '@/hooks/use-operations.ts'
-import { useEnvironments } from '@/hooks/use-environments.ts'
+  useGroups,
+} from '@/features/catalog/hooks.ts'
+import { useEnvironments } from '@/features/environments/hooks.ts'
 import { OperationForm } from '@/components/operation-form.tsx'
 import { ExecutionPanel } from '@/components/execution-panel.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -14,14 +16,19 @@ import { Spinner } from '@/components/ui/spinner.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { ResizeHandle } from '@/components/resize-handle.tsx'
 import { useToast } from '@/components/ui/toast.tsx'
-import { validateOperationForm } from '@/api/validation.ts'
 import { ArrowLeft, Save, Play } from 'lucide-react'
-import type { Operation, OperationConfig, ExecutionResult, OperationType } from '@/api/types.ts'
+import type { OperationConfig, OperationType, ExecutionResult } from '@/api/types.ts'
 
 const TYPE_LABELS: Record<OperationType, string> = {
   HTTP_REQUEST: 'HTTP',
   SQL_QUERY: 'SQL',
   ASSERTION: 'Assert',
+}
+
+function validateName(value: string): string | undefined {
+  if (!value.trim()) return 'Name is required'
+  if (value.length > 100) return 'Name too long'
+  return undefined
 }
 
 export function OperationEditPage() {
@@ -32,79 +39,78 @@ export function OperationEditPage() {
   const { data: operation, isLoading, error } = useOperation(operationId)
   const updateMutation = useUpdateOperation(operationId)
   const executeMutation = useExecuteOperation(operationId)
+
+  const [historyPageIndex, setHistoryPageIndex] = useState(0)
   const { data: executionHistoryPage, isLoading: historyLoading } =
-    useExecutionHistory(operationId)
-  const executionHistory = executionHistoryPage?.content ?? []
+    useExecutionHistory(operationId, historyPageIndex)
 
   const { data: environments = [] } = useEnvironments()
-  const [selectedEnvId, setSelectedEnvId] = useState<string>('')
+  const { data: groups = [] } = useGroups()
 
-  const [name, setName] = useState('')
+  const lsKey = `flowation:env:op:${operationId}`
+  const [selectedEnvId, setSelectedEnvIdRaw] = useState<string>(
+    () => localStorage.getItem(lsKey) ?? '',
+  )
+  const setSelectedEnvId = (id: string) => {
+    localStorage.setItem(lsKey, id)
+    setSelectedEnvIdRaw(id)
+  }
+
+  // Config is complex discriminated union — managed outside TanStack Form
   const [config, setConfig] = useState<OperationConfig | null>(null)
+  const [savedConfig, setSavedConfig] = useState<OperationConfig | null>(null)
+  const [groupId, setGroupId] = useState<string | null>(null)
+  const [savedGroupId, setSavedGroupId] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<ExecutionResult | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [panelHeight, setPanelHeight] = useState(288)
-  const [validationErrors, setValidationErrors] = useState<Record<string, string> | null>(null)
   const onResize = useCallback((h: number) => setPanelHeight(h), [])
 
-  // Snapshot of the last saved state — used to compute dirty
-  const [savedSnapshot, setSavedSnapshot] = useState<{ name: string; config: OperationConfig } | null>(null)
+  const form = useForm({
+    defaultValues: { name: '' },
+    onSubmit: async ({ value }) => {
+      if (!config) return
+      try {
+        const saved = await updateMutation.mutateAsync({
+          name: value.name.trim(),
+          config,
+          groupId,
+        })
+        setConfig(saved.configTemplate)
+        setSavedConfig(saved.configTemplate)
+        setGroupId(saved.groupId ?? null)
+        setSavedGroupId(saved.groupId ?? null)
+        form.reset({ name: saved.name })
+        toast({ title: 'Saved', variant: 'success' })
+      } catch (err) {
+        toast({ title: 'Save failed', description: String(err), variant: 'error' })
+      }
+    },
+  })
 
-  const dirty = savedSnapshot !== null && config !== null
-    && (name.trim() !== savedSnapshot.name || JSON.stringify(config) !== JSON.stringify(savedSnapshot.config))
-
-  // Seed form only on initial load
+  // Seed form once operation loads
   useEffect(() => {
     if (operation && !initialized) {
-      setName(operation.name)
+      form.reset({ name: operation.name })
       setConfig(operation.configTemplate)
-      setSavedSnapshot({ name: operation.name, config: operation.configTemplate })
+      setSavedConfig(operation.configTemplate)
+      setGroupId(operation.groupId ?? null)
+      setSavedGroupId(operation.groupId ?? null)
       setInitialized(true)
     }
   }, [operation, initialized])
 
-  // Clear validation errors on edit
-  useEffect(() => {
-    if (validationErrors) setValidationErrors(null)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, config])
+  const configDirty =
+    config !== null && savedConfig !== null &&
+    JSON.stringify(config) !== JSON.stringify(savedConfig)
+  const groupDirty = groupId !== savedGroupId
+  const dirty = form.state.isDirty || configDirty || groupDirty
 
-  const syncFromSaved = (saved: Operation) => {
-    setName(saved.name)
-    setConfig(saved.configTemplate)
-    setSavedSnapshot({ name: saved.name, config: saved.configTemplate })
-  }
-
-  const validate = (): boolean => {
-    if (!config) return false
-    const errors = validateOperationForm(name, config)
-    if (errors) {
-      setValidationErrors(errors)
-      const firstError = Object.values(errors)[0]
-      toast({ title: 'Validation error', description: firstError, variant: 'error' })
-      return false
-    }
-    return true
-  }
-
-  const handleSave = async () => {
-    if (!config || !validate()) return
-    try {
-      const saved = await updateMutation.mutateAsync({ name: name.trim(), config })
-      syncFromSaved(saved)
-      toast({ title: 'Saved', variant: 'success' })
-    } catch (err) {
-      toast({ title: 'Save failed', description: String(err), variant: 'error' })
-    }
-  }
+  const handleSave = () => form.handleSubmit()
 
   const handleRun = async () => {
     try {
-      if (dirty && config) {
-        if (!validate()) return
-        const saved = await updateMutation.mutateAsync({ name: name.trim(), config })
-        syncFromSaved(saved)
-      }
+      if (dirty) await form.handleSubmit()
       const result = await executeMutation.mutateAsync(selectedEnvId || undefined)
       setLastResult(result)
       if (result.status === 'FAILED') {
@@ -183,17 +189,31 @@ export function OperationEditPage() {
 
       {/* Form */}
       <div className="flex-1 overflow-auto p-4 min-h-0">
-        <div>
-          {config && (
-            <OperationForm
-              name={name}
-              config={config}
-              onNameChange={setName}
-              onConfigChange={setConfig}
-              validationErrors={validationErrors}
-            />
-          )}
-        </div>
+        {config && (
+          <form.Field
+            name="name"
+            validators={{
+              onChange: ({ value }) => validateName(value),
+            }}
+          >
+            {(field) => (
+              <OperationForm
+                name={field.state.value}
+                config={config}
+                onNameChange={(v) => field.handleChange(v)}
+                onConfigChange={setConfig}
+                groupId={groupId}
+                onGroupIdChange={setGroupId}
+                groups={groups}
+                validationErrors={
+                  field.state.meta.isTouched && field.state.meta.errors.length > 0
+                    ? { name: String(field.state.meta.errors[0]) }
+                    : null
+                }
+              />
+            )}
+          </form.Field>
+        )}
       </div>
 
       {/* Resize handle + Execution panel */}
@@ -201,9 +221,11 @@ export function OperationEditPage() {
       <div className="shrink-0 overflow-hidden" style={{ height: panelHeight }}>
         <ExecutionPanel
           result={lastResult}
-          history={executionHistory}
+          historyPage={executionHistoryPage}
           isExecuting={executeMutation.isPending}
           isLoadingHistory={historyLoading}
+          historyPageIndex={historyPageIndex}
+          onHistoryPageChange={setHistoryPageIndex}
         />
       </div>
     </div>

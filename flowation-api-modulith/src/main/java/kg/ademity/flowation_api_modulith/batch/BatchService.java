@@ -24,7 +24,7 @@ public class BatchService {
     private final TenantContext tenantContext;
 
     public List<BatchResponse> listAll() {
-        return batchRepository.findAllByOwnerIdOrderByCreatedAtDesc(tenantContext.getOwnerId())
+        return batchRepository.findAllByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(tenantContext.getOwnerId())
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -53,8 +53,9 @@ public class BatchService {
     }
 
     public void delete(UUID id) {
-        findById(id);
-        batchRepository.deleteById(id);
+        Batch batch = findById(id);
+        batch.setDeletedAt(Instant.now());
+        batchRepository.save(batch);
     }
 
     @Transactional
@@ -108,7 +109,7 @@ public class BatchService {
     }
 
     public Batch findById(UUID id) {
-        return batchRepository.findById(id)
+        return batchRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Batch not found: " + id));
     }
 

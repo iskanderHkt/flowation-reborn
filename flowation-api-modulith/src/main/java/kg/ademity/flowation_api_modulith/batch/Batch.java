@@ -21,4 +21,5 @@ public class Batch {
     private BatchMode mode;
     private Instant createdAt;
     private Instant updatedAt;
+    private Instant deletedAt;
 }

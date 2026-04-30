@@ -12,6 +12,7 @@ public final class HttpOperationConfig implements OperationConfig {
     private Map<String, String> headers;
     private String body;
     private Integer timeoutMs;
+    private boolean failOnHttpError = false;
 
     @Override
     public OperationType type() {

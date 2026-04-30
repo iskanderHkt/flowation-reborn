@@ -36,10 +36,11 @@ CREATE TABLE operations (
     type            VARCHAR(20) NOT NULL,
     config_template JSONB NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at      TIMESTAMPTZ
 );
 
-CREATE INDEX idx_operations_owner ON operations(owner_id);
+CREATE INDEX idx_operations_owner ON operations(owner_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_operations_group ON operations(group_id);
 CREATE INDEX idx_operations_type  ON operations(type);
 
@@ -53,10 +54,11 @@ CREATE TABLE flows (
     name        VARCHAR(255) NOT NULL,
     description TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at  TIMESTAMPTZ
 );
 
-CREATE INDEX idx_flows_owner ON flows(owner_id);
+CREATE INDEX idx_flows_owner ON flows(owner_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE flow_steps (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -117,10 +119,11 @@ CREATE TABLE environments (
     owner_id   UUID NOT NULL REFERENCES users(id),
     name       VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_environments_owner ON environments(owner_id);
+CREATE INDEX idx_environments_owner ON environments(owner_id) WHERE deleted_at IS NULL;
 
 CREATE TABLE env_variables (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -191,10 +194,11 @@ CREATE TABLE batches (
     name       VARCHAR(255) NOT NULL,
     mode       VARCHAR(20) NOT NULL, -- MULTI | DATA_DRIVEN
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_batches_owner ON batches(owner_id);
+CREATE INDEX idx_batches_owner ON batches(owner_id) WHERE deleted_at IS NULL;
 
 -- MULTI: N items (each runs once) | DATA_DRIVEN: exactly 1 item (runs per data row)
 CREATE TABLE batch_items (

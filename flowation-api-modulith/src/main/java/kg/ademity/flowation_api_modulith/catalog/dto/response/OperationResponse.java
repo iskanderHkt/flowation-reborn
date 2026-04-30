@@ -12,6 +12,7 @@ public record OperationResponse(
         String name,
         OperationType type,
         OperationConfig configTemplate,
+        UUID groupId,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -21,6 +22,7 @@ public record OperationResponse(
                 op.getName(),
                 op.getType(),
                 op.getConfigTemplate(),
+                op.getGroupId(),
                 op.getCreatedAt(),
                 op.getUpdatedAt()
         );
