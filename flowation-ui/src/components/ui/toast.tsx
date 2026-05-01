@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/cn.ts'
 
 /* ------------------------------------------------------------------ */
@@ -109,34 +110,25 @@ function ToastItem({
   onClose: (id: number) => void
   duration?: number
 }) {
-  const [visible, setVisible] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  // Slide in on mount
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
 
   // Auto-dismiss
   useEffect(() => {
-    timerRef.current = setTimeout(() => {
-      setVisible(false)
-      setTimeout(() => onClose(entry.id), 200) // wait for exit animation
-    }, duration)
+    timerRef.current = setTimeout(() => onClose(entry.id), duration)
     return () => clearTimeout(timerRef.current)
   }, [duration, entry.id, onClose])
 
   const variant = entry.variant ?? 'info'
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, x: 24, scale: 0.95 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: 24, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
       className={cn(
-        'pointer-events-auto flex w-80 items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 shadow-lg transition-all duration-200 border-l-4',
+        'pointer-events-auto flex w-80 items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-elevated)] p-3 shadow-lg border-l-4',
         variantStyles[variant],
-        visible
-          ? 'translate-x-0 opacity-100'
-          : 'translate-x-4 opacity-0',
       )}
       role="alert"
     >
@@ -155,10 +147,7 @@ function ToastItem({
 
       <button
         type="button"
-        onClick={() => {
-          setVisible(false)
-          setTimeout(() => onClose(entry.id), 200)
-        }}
+        onClick={() => onClose(entry.id)}
         className="shrink-0 rounded-[var(--radius-sm)] p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-hover)] transition-colors cursor-pointer"
         aria-label="Close"
       >
@@ -166,7 +155,7 @@ function ToastItem({
           <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
         </svg>
       </button>
-    </div>
+    </motion.div>
   )
 }
 
@@ -209,14 +198,16 @@ export function ToastProvider({
         aria-live="polite"
         className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2"
       >
-        {toasts.map((entry) => (
-          <ToastItem
-            key={entry.id}
-            entry={entry}
-            onClose={dismiss}
-            duration={duration}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {toasts.map((entry) => (
+            <ToastItem
+              key={entry.id}
+              entry={entry}
+              onClose={dismiss}
+              duration={duration}
+            />
+          ))}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   )

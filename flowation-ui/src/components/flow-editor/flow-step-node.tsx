@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { motion } from 'motion/react'
 import { Badge } from '@/components/ui/badge.tsx'
 import { cn } from '@/lib/cn.ts'
 import { GitBranch, ChevronRight, ChevronDown } from 'lucide-react'
@@ -28,9 +29,11 @@ export function FlowStepNode({ data }: NodeProps) {
   const statusBorder = d.executionStatus ? STATUS_BORDER[d.executionStatus] : 'border-[var(--color-accent-muted)]'
 
   return (
-    <div
+    <motion.div
+      animate={{ scale: d.selected ? 1.03 : 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
       className={cn(
-        'min-w-[200px] rounded-[var(--radius-lg)] border-2 border-dashed bg-[var(--color-bg-tertiary)] shadow-lg transition-all',
+        'min-w-[200px] rounded-[var(--radius-lg)] border-2 border-dashed bg-[var(--color-bg-tertiary)] shadow-lg',
         statusBorder,
         d.selected && 'ring-2 ring-[var(--color-accent)] ring-offset-1 ring-offset-[var(--color-bg-primary)]',
       )}
@@ -78,6 +81,6 @@ export function FlowStepNode({ data }: NodeProps) {
       </div>
 
       <Handle type="source" position={Position.Bottom} className="!bg-[var(--color-accent)] !w-2 !h-2 !border-0" />
-    </div>
+    </motion.div>
   )
 }

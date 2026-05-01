@@ -3,7 +3,7 @@ import { useOperations, useDeleteOperation } from '@/hooks/use-operations.ts'
 import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup } from '@/hooks/use-groups.ts'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Spinner } from '@/components/ui/spinner.tsx'
+import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { Select } from '@/components/ui/select.tsx'
 import { QuickRunDrawer } from '@/components/quick-run-drawer.tsx'
 import { ConfirmPopover } from '@/components/ui/confirm-popover.tsx'
@@ -230,9 +230,7 @@ export function OperationsPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Spinner className="h-5 w-5" />
-        </div>
+        <CatalogTableSkeleton />
       ) : error ? (
         <div className="text-sm text-[var(--color-error)] py-10 text-center">
           Failed to load operations
@@ -573,6 +571,38 @@ function GroupRow({
           <Trash2 size={11} />
         </button>
       </ConfirmPopover>
+    </div>
+  )
+}
+
+/* ─── Catalog table skeleton ──────────────────────── */
+
+function CatalogTableSkeleton() {
+  return (
+    <div className="border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+            {[120, 60, 80, 90, 90, 60].map((w, i) => (
+              <th key={i} className="px-4 py-2.5">
+                <Skeleton className={`h-3 w-${w === 120 ? '24' : w === 90 ? '16' : w === 80 ? '14' : '10'}`} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <tr key={i} className="border-b border-[var(--color-border-subtle)] last:border-0">
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-40" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-5 w-12 rounded-full" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-20" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-24" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-24" /></td>
+              <td className="px-4 py-2.5 text-right"><Skeleton className="h-6 w-16 ml-auto" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -351,6 +351,7 @@ export function FlowEditPage() {
                   operations={operations}
                   flows={allFlows}
                   executionResult={latestExecution?.steps.find((s) => s.stepRefId === selectedStep.id)}
+                  selectedEnvId={selectedEnvId || undefined}
                   onDelete={selectedStepFlowId ? undefined : () => handleDeleteStep(selectedStep.id)}
                   onDrillDown={handleDrillDown}
                 />

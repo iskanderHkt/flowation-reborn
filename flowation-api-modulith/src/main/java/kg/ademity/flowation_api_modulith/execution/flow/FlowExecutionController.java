@@ -44,7 +44,8 @@ public class FlowExecutionController {
     @PostMapping("/{flowId}/steps/{stepId}/test")
     public ResponseEntity<StepResultResponse> testStep(
             @PathVariable UUID flowId,
-            @PathVariable UUID stepId) {
-        return ResponseEntity.ok(service.testStep(flowId, stepId));
+            @PathVariable UUID stepId,
+            @RequestParam(required = false) UUID environmentId) {
+        return ResponseEntity.ok(service.testStep(flowId, stepId, environmentId));
     }
 }

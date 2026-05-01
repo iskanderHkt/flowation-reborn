@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query'
 import { flowsApi } from './api.ts'
 import type {
+  Flow,
   FlowCreateRequest,
   FlowUpdateRequest,
   FlowStep,
@@ -65,7 +66,16 @@ export function useDeleteFlow() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => flowsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: flowKeys.all() }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: flowKeys.all() })
+      const previous = qc.getQueryData<Flow[]>(flowKeys.all())
+      qc.setQueryData<Flow[]>(flowKeys.all(), (old) => old?.filter((f) => f.id !== id) ?? [])
+      return { previous }
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous !== undefined) qc.setQueryData(flowKeys.all(), ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: flowKeys.all() }),
   })
 }
 
@@ -197,6 +207,6 @@ export function useFlowExecutionHistory(flowId: string, page = 0, size = 20) {
 
 export function useTestFlowStep(flowId: string, stepId: string) {
   return useMutation({
-    mutationFn: () => flowsApi.testStep(flowId, stepId),
+    mutationFn: (environmentId?: string) => flowsApi.testStep(flowId, stepId, environmentId),
   })
 }

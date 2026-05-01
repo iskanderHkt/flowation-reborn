@@ -17,6 +17,7 @@ import { Tabs } from '@/components/ui/tabs.tsx'
 import { useToast } from '@/components/ui/toast.tsx'
 import { ArrowLeft, Plus, Trash2, Play, X, Check, GitBranch, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import { useAutoAnimate } from '@formkit/auto-animate/react'
 import type { BatchItemType, BatchRunStatus, BatchItemRequest, BatchRun } from '@/api/types.ts'
 import { cn } from '@/lib/cn.ts'
 
@@ -453,6 +454,7 @@ export function BatchEditPage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
 
   const nameInputRef = useRef<HTMLInputElement>(null)
+  const [itemsListRef] = useAutoAnimate<HTMLDivElement>()
 
   // Sync local state from server
   useEffect(() => {
@@ -667,7 +669,7 @@ export function BatchEditPage() {
               </p>
             </div>
           ) : (
-            <div className="border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden">
+            <div ref={itemsListRef} className="border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden">
               {items.map((item, idx) => (
                 <div
                   key={idx}

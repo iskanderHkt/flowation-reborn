@@ -83,6 +83,10 @@ export const flowsApi = {
       .get(`flows/${flowId}/executions`, { searchParams: { page, size } })
       .json<PageResult<FlowExecutionResult>>(),
 
-  testStep: (flowId: string, stepId: string) =>
-    api.post(`flows/${flowId}/steps/${stepId}/test`).json<StepResultResponse>(),
+  testStep: (flowId: string, stepId: string, environmentId?: string) =>
+    api
+      .post(`flows/${flowId}/steps/${stepId}/test`, {
+        searchParams: environmentId ? { environmentId } : {},
+      })
+      .json<StepResultResponse>(),
 }

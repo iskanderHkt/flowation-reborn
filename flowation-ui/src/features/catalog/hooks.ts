@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { operationsApi, groupsApi } from './api.ts'
 import type {
+  Operation,
   OperationCreateRequest,
   OperationUpdateRequest,
   OperationGroupCreateRequest,
@@ -61,7 +62,16 @@ export function useDeleteOperation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => operationsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: operationKeys.all() }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: operationKeys.all() })
+      const previous = qc.getQueryData<Operation[]>(operationKeys.all())
+      qc.setQueryData<Operation[]>(operationKeys.all(), (old) => old?.filter((op) => op.id !== id) ?? [])
+      return { previous }
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous !== undefined) qc.setQueryData(operationKeys.all(), ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: operationKeys.all() }),
   })
 }
 

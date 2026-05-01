@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Link } from '@tanstack/react-router'
 import { useExecuteOperation, useExecutionHistory } from '@/hooks/use-operations.ts'
 import { ResultView } from '@/components/execution-panel.tsx'
@@ -158,16 +159,24 @@ export function QuickRunDrawer({ operation, onClose }: QuickRunDrawerProps) {
                 </div>
               )}
 
-              {lastResult && (
-                <div className="border-t border-[var(--color-border)]">
-                  <div className="px-4 py-2 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
-                    <span className="text-xs font-medium text-[var(--color-text-secondary)]">Result</span>
-                  </div>
-                  <div className="p-2">
-                    <ResultView result={lastResult} compact={false} />
-                  </div>
-                </div>
-              )}
+              <AnimatePresence>
+                {lastResult && (
+                  <motion.div
+                    key={lastResult.runId}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="border-t border-[var(--color-border)]"
+                  >
+                    <div className="px-4 py-2 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
+                      <span className="text-xs font-medium text-[var(--color-text-secondary)]">Result</span>
+                    </div>
+                    <div className="p-2">
+                      <ResultView result={lastResult} compact={false} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* History — always visible */}
               {!executeMutation.isPending && (

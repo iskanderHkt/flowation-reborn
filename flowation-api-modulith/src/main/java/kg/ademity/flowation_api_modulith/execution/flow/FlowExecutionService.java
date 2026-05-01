@@ -154,13 +154,13 @@ public class FlowExecutionService {
      * Executes a single step in isolation with an empty RuntimeContext.
      * Result is NOT persisted — used for interactive testing during flow configuration.
      */
-    public StepResultResponse testStep(UUID flowId, UUID stepId) {
+    public StepResultResponse testStep(UUID flowId, UUID stepId, UUID environmentId) {
         Optional<UUID> nestedFlowId = flowPlanPort.getNestedFlowId(flowId, stepId);
 
         if (nestedFlowId.isPresent()) {
             // FLOW_STEP — run the nested flow and return a summary
             Instant start = Instant.now();
-            FlowExecutionResultResponse nestedResult = execute(nestedFlowId.get(), null);
+            FlowExecutionResultResponse nestedResult = execute(nestedFlowId.get(), environmentId);
             Instant end = Instant.now();
             String errorMsg = nestedResult.status() == ExecutionStatus.FAILED ? "Nested flow failed" : null;
             return new StepResultResponse(0, stepId, nestedResult.status(),
@@ -175,8 +175,9 @@ public class FlowExecutionService {
                 .findFirst()
                 .orElseThrow(() -> new StepExecutionException("No executor for type: " + compiled.operationType()));
 
+        Map<String, Object> runtimeContext = new HashMap<>(envContextPort.loadContext(environmentId));
         Instant start = Instant.now();
-        StepResult result = executor.executeRaw(compiled.mergedConfig(), new HashMap<>());
+        StepResult result = executor.executeRaw(compiled.mergedConfig(), runtimeContext);
         Instant end = Instant.now();
 
         return new StepResultResponse(

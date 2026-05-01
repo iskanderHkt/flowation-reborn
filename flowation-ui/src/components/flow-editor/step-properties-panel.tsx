@@ -24,6 +24,7 @@ interface StepPropertiesPanelProps {
   operations: Operation[]
   flows: Flow[]
   executionResult?: StepResultResponse
+  selectedEnvId?: string
   onDelete?: () => void
   onDrillDown: (flowId: string) => void
 }
@@ -34,6 +35,7 @@ export function StepPropertiesPanel({
   operations,
   flows,
   executionResult,
+  selectedEnvId,
   onDelete,
   onDrillDown,
 }: StepPropertiesPanelProps) {
@@ -86,7 +88,7 @@ export function StepPropertiesPanel({
 
   const handleTest = async () => {
     try {
-      const result = await testMutation.mutateAsync()
+      const result = await testMutation.mutateAsync(selectedEnvId || undefined)
       setTestResult(result)
     } catch (err) {
       toast({ title: 'Test failed', description: String(err), variant: 'error' })

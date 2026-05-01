@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useEnvironments, useDeleteEnvironment } from '@/hooks/use-environments.ts'
 import { Button } from '@/components/ui/button.tsx'
-import { Spinner } from '@/components/ui/spinner.tsx'
+import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { ConfirmPopover } from '@/components/ui/confirm-popover.tsx'
 import { Plus, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useMemo } from 'react'
@@ -109,9 +109,7 @@ export function EnvironmentsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Spinner className="h-5 w-5" />
-        </div>
+        <EnvsTableSkeleton />
       ) : error ? (
         <div className="text-sm text-[var(--color-error)] py-10 text-center">Failed to load environments</div>
       ) : !filtered.length ? (
@@ -212,6 +210,33 @@ export function EnvironmentsPage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+function EnvsTableSkeleton() {
+  return (
+    <div className="border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <th key={i} className="px-4 py-2.5"><Skeleton className="h-3 w-14" /></th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <tr key={i} className="border-b border-[var(--color-border-subtle)] last:border-0">
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-32" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-16" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-24" /></td>
+              <td className="px-4 py-2.5"><Skeleton className="h-3.5 w-24" /></td>
+              <td className="px-4 py-2.5 text-right"><Skeleton className="h-6 w-12 ml-auto" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

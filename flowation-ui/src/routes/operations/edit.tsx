@@ -12,12 +12,39 @@ import { useEnvironments } from '@/features/environments/hooks.ts'
 import { OperationForm } from '@/components/operation-form.tsx'
 import { ExecutionPanel } from '@/components/execution-panel.tsx'
 import { Button } from '@/components/ui/button.tsx'
-import { Spinner } from '@/components/ui/spinner.tsx'
+import { Skeleton } from '@/components/ui/skeleton.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { ResizeHandle } from '@/components/resize-handle.tsx'
 import { useToast } from '@/components/ui/toast.tsx'
 import { ArrowLeft, Save, Play } from 'lucide-react'
 import type { OperationConfig, OperationType, ExecutionResult } from '@/api/types.ts'
+
+function OperationEditSkeleton() {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-3 px-4 h-12 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] shrink-0">
+        <Skeleton className="h-4 w-4" />
+        <Skeleton className="h-5 w-12 rounded-full" />
+        <Skeleton className="h-4 w-40" />
+        <div className="ml-auto flex items-center gap-2">
+          <Skeleton className="h-7 w-20" />
+          <Skeleton className="h-7 w-16" />
+        </div>
+      </div>
+      <div className="flex-1 p-4 space-y-4">
+        <Skeleton className="h-7 w-64" />
+        <div className="flex gap-2">
+          <Skeleton className="h-7 w-16 rounded-full" />
+          <Skeleton className="h-7 w-16 rounded-full" />
+          <Skeleton className="h-7 w-20 rounded-full" />
+        </div>
+        <Skeleton className="h-7 w-full max-w-sm" />
+        <Skeleton className="h-7 w-full max-w-xs" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    </div>
+  )
+}
 
 const TYPE_LABELS: Record<OperationType, string> = {
   HTTP_REQUEST: 'HTTP',
@@ -122,11 +149,7 @@ export function OperationEditPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Spinner className="h-5 w-5" />
-      </div>
-    )
+    return <OperationEditSkeleton />
   }
 
   if (error || !operation) {

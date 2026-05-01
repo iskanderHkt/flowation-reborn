@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { environmentsApi } from './api.ts'
 import type {
+  Environment,
   EnvironmentCreateRequest,
   EnvironmentUpdateRequest,
   UpsertVariablesRequest,
@@ -54,7 +55,16 @@ export function useDeleteEnvironment() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => environmentsApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: environmentKeys.all() }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: environmentKeys.all() })
+      const previous = qc.getQueryData<Environment[]>(environmentKeys.all())
+      qc.setQueryData<Environment[]>(environmentKeys.all(), (old) => old?.filter((e) => e.id !== id) ?? [])
+      return { previous }
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous !== undefined) qc.setQueryData(environmentKeys.all(), ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: environmentKeys.all() }),
   })
 }
 

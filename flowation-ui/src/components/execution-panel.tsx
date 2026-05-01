@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { HistoryPagination } from '@/components/ui/history-pagination.tsx'
 import { cn } from '@/lib/cn.ts'
@@ -48,12 +49,28 @@ export function ExecutionPanel({
             <div className="flex items-center gap-2 py-8 justify-center text-sm text-[var(--color-text-muted)]">
               <Spinner /> Executing...
             </div>
-          ) : result ? (
-            <ResultView result={result} compact={false} />
           ) : (
-            <div className="text-sm text-[var(--color-text-muted)] py-8 text-center">
-              Run the operation to see results here
-            </div>
+            <AnimatePresence mode="wait">
+              {result ? (
+                <motion.div
+                  key={result.runId}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <ResultView result={result} compact={false} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-sm text-[var(--color-text-muted)] py-8 text-center"
+                >
+                  Run the operation to see results here
+                </motion.div>
+              )}
+            </AnimatePresence>
           )
         ) : isLoadingHistory ? (
           <div className="flex items-center justify-center py-8">

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { batchesApi } from './api.ts'
 import type {
+  Batch,
   BatchCreateRequest,
   BatchUpdateRequest,
   SetBatchItemsRequest,
@@ -59,7 +60,16 @@ export function useDeleteBatch() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => batchesApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: batchKeys.all() }),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: batchKeys.all() })
+      const previous = qc.getQueryData<Batch[]>(batchKeys.all())
+      qc.setQueryData<Batch[]>(batchKeys.all(), (old) => old?.filter((b) => b.id !== id) ?? [])
+      return { previous }
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous !== undefined) qc.setQueryData(batchKeys.all(), ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: batchKeys.all() }),
   })
 }
 
