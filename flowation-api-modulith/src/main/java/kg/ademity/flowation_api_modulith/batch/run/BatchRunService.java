@@ -40,7 +40,7 @@ public class BatchRunService {
     private final TenantContext tenantContext;
     private final ExecutorService batchExecutor;
 
-    public BatchRun start(UUID batchId) {
+    public BatchRun start(UUID batchId, UUID environmentId) {
         Batch batch = batchService.findById(batchId);
         List<BatchItem> items = batchService.getItems(batchId);
 
@@ -62,7 +62,7 @@ public class BatchRunService {
                 .createdAt(Instant.now())
                 .build());
 
-        CompletableFuture.runAsync(() -> executeAsync(run, batch, items), batchExecutor);
+        CompletableFuture.runAsync(() -> executeAsync(run, batch, items, environmentId), batchExecutor);
 
         return run;
     }
@@ -87,7 +87,7 @@ public class BatchRunService {
         return toResponse(run);
     }
 
-    private void executeAsync(BatchRun run, Batch batch, List<BatchItem> items) {
+    private void executeAsync(BatchRun run, Batch batch, List<BatchItem> items, UUID environmentId) {
         run.setStatus(BatchRunStatus.RUNNING);
         run.setStartedAt(Instant.now());
         batchRunRepository.save(run);
@@ -99,8 +99,8 @@ public class BatchRunService {
                 batch.getName(), batch.getMode(), run.getId().toString().substring(0, 8), count);
 
         List<CompletableFuture<UUID>> futures = batch.getMode() == BatchMode.MULTI
-                ? buildMultiFutures(items, run.getId())
-                : buildDataDrivenFutures(items.get(0), batchService.getDataRows(batch.getId()), run.getId());
+                ? buildMultiFutures(items, run.getId(), environmentId)
+                : buildDataDrivenFutures(items.get(0), batchService.getDataRows(batch.getId()), run.getId(), environmentId);
 
         List<UUID> executionRunIds = futures.stream()
                 .map(CompletableFuture::join)
@@ -117,20 +117,20 @@ public class BatchRunService {
     }
 
     // MULTI: each item executes once with empty input variables
-    private List<CompletableFuture<UUID>> buildMultiFutures(List<BatchItem> items, UUID batchRunId) {
+    private List<CompletableFuture<UUID>> buildMultiFutures(List<BatchItem> items, UUID batchRunId, UUID environmentId) {
         return items.stream()
                 .map(item -> CompletableFuture.supplyAsync(
-                        () -> executeItem(item, null, Map.of(), batchRunId),
+                        () -> executeItem(item, environmentId, Map.of(), batchRunId),
                         batchExecutor))
                 .toList();
     }
 
     // DATA_DRIVEN: single item executes once per data row
     private List<CompletableFuture<UUID>> buildDataDrivenFutures(
-            BatchItem item, List<BatchDataRow> dataRows, UUID batchRunId) {
+            BatchItem item, List<BatchDataRow> dataRows, UUID batchRunId, UUID environmentId) {
         return dataRows.stream()
                 .map(row -> CompletableFuture.supplyAsync(
-                        () -> executeItem(item, null, row.getVariables(), batchRunId),
+                        () -> executeItem(item, environmentId, row.getVariables(), batchRunId),
                         batchExecutor))
                 .toList();
     }
