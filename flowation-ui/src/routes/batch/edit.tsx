@@ -1,15 +1,18 @@
 import { useNavigate, useParams } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import {
+  batchKeys,
   useBatch,
   useUpdateBatch,
   useSetBatchItems,
   useSetBatchDataRows,
   useStartBatchRun,
   useBatchRuns,
-  useBatchRun,
+  useBatchRunStream,
 } from '@/hooks/use-batches.ts'
 import { useFlows } from '@/hooks/use-flows.ts'
 import { useOperations } from '@/hooks/use-operations.ts'
+import { useEnvironments } from '@/hooks/use-environments.ts'
 import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -18,7 +21,7 @@ import { useToast } from '@/components/ui/toast.tsx'
 import { ArrowLeft, Plus, Trash2, Play, X, Check, GitBranch, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useAutoAnimate } from '@formkit/auto-animate/react'
-import type { BatchItemType, BatchRunStatus, BatchItemRequest, BatchRun } from '@/api/types.ts'
+import type { BatchItemRequest, BatchRunStatus } from '@/api/types.ts'
 import { cn } from '@/lib/cn.ts'
 
 /* ── Status badge for batch runs ────────────────────── */
@@ -282,22 +285,26 @@ function DatasetEditor({
 
 /* ── Run result panel ────────────────────────────────── */
 
-function RunResultPanel({ batchId, runId }: { batchId: string; runId: string }) {
-  const isTerminal = (status: BatchRunStatus) =>
-    status === 'COMPLETED' || status === 'FAILED' || status === 'PARTIAL'
-
-  const [polling, setPolling] = useState(true)
-  const { data: display } = useBatchRun(batchId, runId, polling)
+function RunResultPanel({
+  batchId,
+  runId,
+  onCompleted,
+}: {
+  batchId: string
+  runId: string
+  onCompleted: () => void
+}) {
+  const stream = useBatchRunStream(batchId, runId)
 
   useEffect(() => {
-    if (display && isTerminal(display.status)) {
-      setPolling(false)
+    if (!stream.isStreaming && stream.runStatus) {
+      onCompleted()
     }
-  }, [display?.status])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.isStreaming])
 
-  if (!display) return <Spinner className="h-4 w-4" />
-
-  const badge = RUN_STATUS_BADGE[display.status]
+  const displayStatus = stream.runStatus ?? 'RUNNING'
+  const badge = RUN_STATUS_BADGE[displayStatus]
 
   return (
     <div className="border border-[var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden">
@@ -306,11 +313,15 @@ function RunResultPanel({ batchId, runId }: { batchId: string; runId: string }) 
           Run result
         </span>
         <div className="flex items-center gap-2">
-          {display.status === 'RUNNING' && <Spinner className="h-3 w-3" />}
+          {stream.isStreaming && <Spinner className="h-3 w-3" />}
           <Badge variant={badge.variant}>{badge.label}</Badge>
         </div>
       </div>
-      {display.items.length > 0 && (
+      {stream.items.length === 0 && stream.isStreaming ? (
+        <div className="flex items-center justify-center gap-2 py-6 text-xs text-[var(--color-text-muted)]">
+          <Spinner className="h-3 w-3" /> Waiting for items…
+        </div>
+      ) : stream.items.length > 0 ? (
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-secondary)]">
@@ -321,11 +332,13 @@ function RunResultPanel({ batchId, runId }: { batchId: string; runId: string }) 
             </tr>
           </thead>
           <tbody>
-            {display.items.map((item, i) => {
+            {stream.items.map((item, i) => {
               const itemBadge = ITEM_STATUS_BADGE[item.status] ?? ITEM_STATUS_BADGE.PENDING
               return (
                 <tr key={i} className="border-b border-[var(--color-border-subtle)] last:border-0">
-                  <td className="px-4 py-2 text-[var(--color-text-primary)] font-medium truncate max-w-xs">{item.name}</td>
+                  <td className="px-4 py-2 text-[var(--color-text-primary)] font-medium truncate max-w-xs">
+                    {item.name ?? item.referenceId.substring(0, 8) + '…'}
+                  </td>
                   <td className="px-4 py-2 text-[var(--color-text-muted)]">
                     {item.itemType === 'FLOW' ? (
                       <span className="inline-flex items-center gap-1"><GitBranch size={10} /> Flow</span>
@@ -344,7 +357,7 @@ function RunResultPanel({ batchId, runId }: { batchId: string; runId: string }) 
             })}
           </tbody>
         </table>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -438,14 +451,17 @@ export function BatchEditPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
+  const qc = useQueryClient()
   const { data: batch, isLoading, error } = useBatch(batchId)
   const { data: flows } = useFlows()
   const { data: operations } = useOperations()
+  const { data: environments = [] } = useEnvironments()
   const updateMutation = useUpdateBatch(batchId)
   const setItemsMutation = useSetBatchItems(batchId)
   const setDataRowsMutation = useSetBatchDataRows(batchId)
   const startRunMutation = useStartBatchRun(batchId)
 
+  const [selectedEnvId, setSelectedEnvId] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -551,7 +567,7 @@ export function BatchEditPage() {
 
   const handleRun = async () => {
     try {
-      const result = await startRunMutation.mutateAsync()
+      const result = await startRunMutation.mutateAsync(selectedEnvId || undefined)
       setSelectedRunId(result.runId)
       toast({ title: 'Batch run started', variant: 'success' })
     } catch (err) {
@@ -616,7 +632,19 @@ export function BatchEditPage() {
           {batch.mode === 'DATA_DRIVEN' ? 'Data-Driven' : 'Multi'}
         </Badge>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {environments.length > 0 && (
+            <select
+              value={selectedEnvId}
+              onChange={(e) => setSelectedEnvId(e.target.value)}
+              className="h-7 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2 text-xs text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] cursor-pointer"
+            >
+              <option value="">No environment</option>
+              {environments.map((env) => (
+                <option key={env.id} value={env.id}>{env.name}</option>
+              ))}
+            </select>
+          )}
           <Button
             size="sm"
             onClick={handleRun}
@@ -739,7 +767,11 @@ export function BatchEditPage() {
         {selectedRunId && (
           <section>
             <h2 className="text-sm font-semibold text-[var(--color-text-primary)] mb-3">Latest Run</h2>
-            <RunResultPanel batchId={batchId} runId={selectedRunId} />
+            <RunResultPanel
+              batchId={batchId}
+              runId={selectedRunId}
+              onCompleted={() => qc.invalidateQueries({ queryKey: batchKeys.runs(batchId) })}
+            />
           </section>
         )}
 

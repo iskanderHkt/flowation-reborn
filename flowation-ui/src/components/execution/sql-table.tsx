@@ -11,13 +11,13 @@ export function formatCellValue(val: unknown): string {
 }
 
 export function SqlTable({ rows }: { rows: Record<string, unknown>[] }) {
-  if (!rows.length) return null
-
-  const columns = Object.keys(rows[0])
+  const columns = rows.length ? Object.keys(rows[0]) : []
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [showFilters, setShowFilters] = useState(false)
+
+  if (!rows.length) return null
 
   const handleSort = (col: string) => {
     if (sortCol !== col) {

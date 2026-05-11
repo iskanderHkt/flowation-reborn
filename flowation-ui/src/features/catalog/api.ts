@@ -30,6 +30,11 @@ export const operationsApi = {
       searchParams: environmentId ? { environmentId } : {},
     }).json<ExecutionResult>(),
 
+  startRun: (id: string, environmentId?: string) =>
+    api.post(`operations/${id}/runs`, {
+      json: { environmentId: environmentId ?? null, inputVariables: {} },
+    }).json<{ runId: string }>(),
+
   getExecutions: (id: string, page = 0, size = 20) =>
     api
       .get(`operations/${id}/executions`, { searchParams: { page, size } })

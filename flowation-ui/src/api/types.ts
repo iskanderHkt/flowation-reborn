@@ -22,7 +22,7 @@ export interface SqlOperationConfig {
 export interface AssertOperationConfig {
   type: 'ASSERTION'
   expression: string
-  comparator: 'EQ' | 'NEQ' | 'CONTAINS' | 'REGEX' | 'GT' | 'LT' | 'IS_NULL'
+  comparator: 'EQ' | 'NEQ' | 'CONTAINS' | 'REGEX' | 'GT' | 'LT' | 'IS_NULL' | 'IS_NOT_NULL'
   expected: string
 }
 

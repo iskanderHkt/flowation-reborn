@@ -1,5 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useBatchRunStream } from '@/shared/hooks/use-execution-stream.ts'
 import { batchesApi } from './api.ts'
+
+export { useBatchRunStream }
 import type {
   Batch,
   BatchCreateRequest,
@@ -95,7 +98,7 @@ export function useSetBatchDataRows(id: string) {
 export function useStartBatchRun(batchId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => batchesApi.startRun(batchId),
+    mutationFn: (environmentId?: string) => batchesApi.startRun(batchId, environmentId),
     onSuccess: () => qc.invalidateQueries({ queryKey: batchKeys.runs(batchId) }),
   })
 }

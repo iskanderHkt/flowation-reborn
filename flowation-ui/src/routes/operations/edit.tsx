@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   useOperation,
   useUpdateOperation,
-  useExecuteOperation,
+  useStartOperationRun,
   useExecutionHistory,
   useGroups,
+  operationKeys,
 } from '@/features/catalog/hooks.ts'
 import { useEnvironments } from '@/features/environments/hooks.ts'
+import { useExecutionStream } from '@/shared/hooks/use-execution-stream.ts'
 import { OperationForm } from '@/components/operation-form.tsx'
 import { ExecutionPanel } from '@/components/execution-panel.tsx'
 import { Button } from '@/components/ui/button.tsx'
@@ -63,9 +66,10 @@ export function OperationEditPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
+  const qc = useQueryClient()
   const { data: operation, isLoading, error } = useOperation(operationId)
   const updateMutation = useUpdateOperation(operationId)
-  const executeMutation = useExecuteOperation(operationId)
+  const startRunMutation = useStartOperationRun(operationId)
 
   const [historyPageIndex, setHistoryPageIndex] = useState(0)
   const { data: executionHistoryPage, isLoading: historyLoading } =
@@ -89,6 +93,8 @@ export function OperationEditPage() {
   const [groupId, setGroupId] = useState<string | null>(null)
   const [savedGroupId, setSavedGroupId] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<ExecutionResult | null>(null)
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
+  const stream = useExecutionStream(activeRunId)
   const [initialized, setInitialized] = useState(false)
   const [panelHeight, setPanelHeight] = useState(288)
   const onResize = useCallback((h: number) => setPanelHeight(h), [])
@@ -138,15 +144,36 @@ export function OperationEditPage() {
   const handleRun = async () => {
     try {
       if (dirty) await form.handleSubmit()
-      const result = await executeMutation.mutateAsync(selectedEnvId || undefined)
-      setLastResult(result)
-      if (result.status === 'FAILED') {
-        toast({ title: 'Execution failed', description: result.errorMessage ?? undefined, variant: 'error' })
-      }
+      const { runId } = await startRunMutation.mutateAsync(selectedEnvId || undefined)
+      setActiveRunId(runId)
     } catch (err) {
       toast({ title: 'Run failed', description: String(err), variant: 'error' })
     }
   }
+
+  // Build ExecutionResult from stream data when run completes
+  useEffect(() => {
+    if (stream.isStreaming || !stream.runStatus || !activeRunId) return
+    const step = stream.steps[0] ?? null
+    const result: ExecutionResult = {
+      runId: activeRunId,
+      operationId,
+      runMode: 'INSTANT',
+      status: stream.runStatus,
+      startedAt: step?.startedAt ?? stream.completedAt ?? new Date().toISOString(),
+      completedAt: stream.completedAt ?? new Date().toISOString(),
+      durationMs: stream.totalDurationMs ?? 0,
+      requestSnapshot: step?.requestSnapshot ?? {},
+      responseSnapshot: step?.responseSnapshot ?? null,
+      errorMessage: step?.errorMessage ?? null,
+    }
+    setLastResult(result)
+    if (result.status === 'FAILED') {
+      toast({ title: 'Execution failed', description: result.errorMessage ?? undefined, variant: 'error' })
+    }
+    qc.invalidateQueries({ queryKey: operationKeys.executionPage(operationId, historyPageIndex, 20) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.isStreaming])
 
   if (isLoading) {
     return <OperationEditSkeleton />
@@ -202,10 +229,10 @@ export function OperationEditPage() {
           <Button
             size="sm"
             onClick={handleRun}
-            disabled={executeMutation.isPending}
+            disabled={startRunMutation.isPending || stream.isStreaming}
           >
             <Play size={13} />
-            {dirty ? 'Save & Run' : 'Run'}
+            {stream.isStreaming ? 'Running...' : dirty ? 'Save & Run' : 'Run'}
           </Button>
         </div>
       </div>
@@ -245,7 +272,7 @@ export function OperationEditPage() {
         <ExecutionPanel
           result={lastResult}
           historyPage={executionHistoryPage}
-          isExecuting={executeMutation.isPending}
+          isExecuting={startRunMutation.isPending || stream.isStreaming}
           isLoadingHistory={historyLoading}
           historyPageIndex={historyPageIndex}
           onHistoryPageChange={setHistoryPageIndex}

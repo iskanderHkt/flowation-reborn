@@ -31,8 +31,10 @@ export const batchesApi = {
     api.put(`batches/${id}/data-rows`, { json: data }).json<Batch>(),
 
   /* ── Batch Runs ──────────────────────────────────── */
-  startRun: (batchId: string) =>
-    api.post(`batches/${batchId}/runs`).json<BatchStartResponse>(),
+  startRun: (batchId: string, environmentId?: string) =>
+    api.post(`batches/${batchId}/runs`, {
+      json: { environmentId: environmentId ?? null, inputVariables: {} },
+    }).json<BatchStartResponse>(),
 
   getRuns: (batchId: string, page = 0, size = 20) =>
     api

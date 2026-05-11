@@ -17,6 +17,7 @@ export {
   useUpdateExtractionRule,
   useDeleteExtractionRule,
   useExecuteFlow,
+  useStartFlowRun,
   useFlowExecutionHistory,
   useTestFlowStep,
 } from '@/features/flows/hooks.ts'

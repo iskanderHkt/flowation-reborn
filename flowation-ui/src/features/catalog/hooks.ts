@@ -85,6 +85,13 @@ export function useExecuteOperation(operationId: string) {
   })
 }
 
+export function useStartOperationRun(operationId: string) {
+  return useMutation({
+    mutationFn: (environmentId?: string) =>
+      operationsApi.startRun(operationId, environmentId),
+  })
+}
+
 export function useExecutionHistory(operationId: string, page = 0, size = 20) {
   return useQuery({
     queryKey: operationKeys.executionPage(operationId, page, size),

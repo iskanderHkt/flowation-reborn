@@ -160,6 +160,7 @@ kg.ademity.flowation_api_modulith
 - `POST  /api/batches/{id}/runs` → 202 + `{ runId, batchId }`
 - `GET   /api/batches/{id}/runs?page=0&size=20` → `PageResult<BatchRunResponse>`
 - `GET   /api/batches/{id}/runs/{runId}`
+- `GET   /api/batches/{id}/runs/{runId}/stream` → SSE: `item-completed` + `run-completed`
 
 ---
 
@@ -202,8 +203,8 @@ kg.ademity.flowation_api_modulith
   - Inline редактирование имени
   - MULTI: список айтемов + диалог добавления (поиск по флоу/операциям с вкладками)
   - DATA_DRIVEN: выбор одного таргета + редактор датасета (таблица с колонками-переменными)
-  - Run кнопка в хедере → 202 → polling `useBatchRun` каждые 1.5s до terminal статуса
-  - Панель результата текущего рана + история всех ранов
+  - Run кнопка в хедере → 202 → SSE стрим `useBatchRunStream` (заменил polling)
+  - Панель результата показывает айтемы live по мере завершения каждого
 
 ---
 
@@ -214,7 +215,7 @@ kg.ademity.flowation_api_modulith
 
 ---
 
-## Текущее состояние (2026-04-16)
+## Текущее состояние (2026-05-05)
 
 ### Реализовано полностью
 - CRUD операций (HTTP_REQUEST, SQL_QUERY, ASSERTION)
@@ -223,17 +224,20 @@ kg.ademity.flowation_api_modulith
 - Flow steps: LINKED/DETACHED, OPERATION_STEP/FLOW_STEP, on_fail, cycle detection
 - Вложенные флоу с depth validation
 - Environments module
-- **Batch execution** — полностью: MULTI + DATA_DRIVEN, async parallel, PARTIAL статус, polling на фронте
+- **Batch execution** — MULTI + DATA_DRIVEN, async parallel, PARTIAL статус
 - Пагинация истории выполнений на всех трёх endpoint'ах
 - Flow editor UI: ReactFlow canvas, properties panel, execution panel
 - Rich result views: HTTP, SQL, Assert
 - Batch UI: list, create, detail/edit с run panel и историей
+- **SSE streaming** — все три типа (операция, флоу, батч) используют SSE вместо polling/sync
+  - `GET /api/executions/{runId}/stream` — step-completed / run-completed
+  - `GET /api/batches/{batchId}/runs/{runId}/stream` — item-completed / run-completed
+  - Фронт: `useExecutionStream`, `useBatchRunStream` в `shared/hooks/use-execution-stream.ts`
+- **Operation groups** — CRUD, фильтр в каталоге
+- **Executions page** — `/executions`, unified history
 
 ### Не реализовано (Roadmap)
 - **Auth module** — JWT (замена DevContext)
-- **SSE progress** — real-time прогресс для long-running execution
-- **Operation groups** — таблица создана, функциональность не реализована
-- **Executions page** — sidebar disabled
 - **Soft delete**
 - **Secret variables** — хранятся в открытом виде
 - **HTTP response status → FAILED** — 4xx/5xx сейчас успешный шаг, статус проверяется assertion'ом

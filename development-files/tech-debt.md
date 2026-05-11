@@ -1,52 +1,86 @@
 # Technical Debt & Roadmap
 
-Items to address in future iterations. Ordered by priority — top sections should be tackled first.
+Ordered by when each item needs to land. Done items kept for reference.
 
 ---
 
-## High Priority
+## ✅ Done
 
-### ~~SSE Execution Progress~~ ✅ DONE (backend)
+### SSE Execution Progress ✅
 
-**Files:** `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`, `execution/stream/ExecutionStreamService.java`, `execution/stream/ExecutionStreamController.java`
+Async execution for flows and operations (`POST /runs` → 202 + runId), SSE stream `GET /api/executions/{runId}/stream` with `step-completed` + `run-completed` events. Batch SSE: `GET /api/batches/{batchId}/runs/{runId}/stream` with `item-completed` + `run-completed`. Frontend fully migrated — all three pages (operations, flows, batch) use SSE, polling removed.
 
-**What was done:** Added async execution endpoints. `POST /api/flows/{flowId}/runs` and `POST /api/operations/{operationId}/runs` return 202 `{ runId }` immediately. `GET /api/executions/{runId}/stream` streams `step-completed` and `run-completed` SSE events via DB polling (300ms interval). Old sync `/execute` endpoints kept for backward compatibility until frontend migrates.
+### Executions Page ✅
 
-**Remaining:** Frontend migration (Phase 4.1 in `frontend-tech-debt.md`) — switch ExecutionPanel from sync POST to async POST + EventSource SSE stream.
+`/executions` route with unified history across all operations, flows, and batches. Filterable by type and status, paginated.
 
----
+### Operation Groups (Catalog Organization) ✅
 
-## Priority 1 — Polish before any deployment
-
-### ~~Executions Page~~ ✅ DONE
-
-**Files:** `routes/executions/index.tsx`, `hooks/use-all-executions.ts`, `components/sidebar.tsx`, `router.tsx`
-
-**What:** `/executions` route with unified history across all operations, flows, and batches. Filterable by type and status, paginated, clicking a row navigates to the entity's edit page.
+Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group column, group filter select, and inline groups manager. Operation form has group selector.
 
 ---
 
-### ~~Operation Groups (Catalog Organization)~~ ✅ DONE
+## Before Alpha — must land before any real deployment
 
-**Files:** `catalog/OperationGroup.java`, `OperationGroupService`, `OperationGroupController`, `api/groups.ts`, `hooks/use-groups.ts`, `routes/operations/index.tsx`, `operation-form.tsx`
+### Deployment Configuration
 
-**What:** Full CRUD for groups. `group_id` FK added to `operations`. Catalog page shows group column, group filter select, and inline groups manager panel. Operation create/edit form has group selector.
+**Files:** `application.yaml`, no `application-prod.yaml` exists
+
+**What:** DB URL, username, and password are hardcoded in `application.yaml`. `flyway.enabled: false`. No production profile.
+
+**Fix:** Add `application-prod.yaml` with env-variable substitution (`${DB_URL}`, `${DB_USER}`, `${DB_PASS}`). Enable Flyway for prod. Document required env vars in README.
 
 ---
 
-## Priority 2 — Quality & Correctness
+### Mock Stand (One-Command Setup)
 
-## Priority 3 — Infrastructure (post-functional-polish)
+**Files:** `docker-compose.mock.yml`, `mock-api/main.go`
+
+**What:** `docker-compose.mock.yml` only spins up Postgres. The mock API lives separately and hardcodes `localhost:5433` in `main.go`. No single command brings up a full working environment for demos or self-testing.
+
+**Fix:** Add the mock API as a service in `docker-compose.mock.yml`. Parameterize the DB address in `main.go` via env var. Verify `docker compose -f docker-compose.mock.yml up` starts everything needed to run the app end-to-end.
+
+---
+
+## On Alpha — address during early usage phase
+
+### SSE Polling Optimization
+
+**Files:** `execution/stream/ExecutionStreamService.java`, `batch/run/BatchRunStreamService.java`, `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`
+
+**What:** SSE is implemented via DB polling every 300ms. Async jobs start with `Thread.ofVirtual().start(...)` — no bounded executor, no backpressure.
+
+**Future:** Introduce a bounded `ExecutorService` with a configured thread pool for async execution. Add backpressure or a simple task queue before scaling to multi-user load.
+
+---
+
+### Unified Executions — Backend Aggregation
+
+**Files:** `hooks/use-all-executions.ts`
+
+**What:** The executions page fans out to all entity endpoints individually from the frontend. As data volume grows this will be the first thing that gets noisy.
+
+**Future:** Add a backend `GET /api/executions` endpoint that returns a unified, paginated list across flows, operations, and batches, filterable by type/status. Replace the frontend fan-out with a single query.
+
+---
+
+### Tests
+
+**What:** Backend has only the Spring Boot context test. No service or integration tests. No frontend tests at all.
+
+**Future:** Backend: integration tests for at least the execution and batch paths against a real Postgres (Testcontainers). Frontend: component tests for the flow editor and execution stream hook.
+
+---
+
+## After Alpha — post-launch, when auth becomes necessary
 
 ### Auth & Multi-Tenancy
 
-**Files:** `shared/TenantContext.java`, `shared/DevContext.java`, all `findById` calls in services
+**Files:** `shared/TenantContext.java`, `shared/DevContext.java`
 
 **What:** `DevContext` always returns a hardcoded owner UUID. No authentication, no user accounts, no isolation between users.
 
-**Why deferred:** Flowation is targeting SaaS. Auth needs a serious approach — Keycloak or a custom solution with fine-grained object-level access control (who can view/edit/run which flows, environments, batches). This is a next-level stage after all core functionality is polished.
-
-**Future:** Replace `DevContext` with JWT-based `TenantContext`. Add `findByIdAndOwnerId` variants in all repositories. Consider object-level ACLs (share a flow with another user, read-only vs edit permissions). Tenant isolation in all service `findById` calls (see item below).
+**Future:** Replace `DevContext` with JWT-based `TenantContext`. Add `findByIdAndOwnerId` variants in all repositories. Consider object-level ACLs (share a flow with another user, read-only vs edit).
 
 ---
 
@@ -54,11 +88,17 @@ Items to address in future iterations. Ordered by priority — top sections shou
 
 **Files:** `EnvironmentService`, `FlowService`, `OperationService`, `BatchService`
 
-**What:** `findById(UUID id)` queries by ID only, without filtering by `ownerId`. A request with a valid UUID belonging to another tenant would succeed.
+**What:** `findById(UUID id)` queries by ID only, without filtering by `ownerId`. Resolves alongside the Auth item above.
 
-**Why left as-is:** Currently `DevContext` always returns a fixed owner ID — effectively a single-user system. No real multi-tenancy yet.
+---
 
-**Future:** When auth is introduced, replace all `findById` calls with `findByIdAndOwnerId` (or equivalent). Alternatively, enforce at the repository query level with a `@Query` annotation. Resolves automatically alongside the Auth item above.
+### Secret Variables
+
+**Files:** `EnvVariable.java`, `EnvironmentService.java`, environments frontend
+
+**What:** Environment variables (API keys, passwords, DB credentials) are stored and returned as plain text.
+
+**Future:** Encrypt sensitive values at-rest using AES-GCM with a master key from config. Add a `secret: boolean` flag to `EnvVariable`. Secret values are encrypted on write, decrypted on use, never returned in GET responses (masked as `"***"`).
 
 ---
 
@@ -68,18 +108,4 @@ Items to address in future iterations. Ordered by priority — top sections shou
 
 **What:** All HTTPS requests skip certificate validation (trust-all `X509TrustManager`).
 
-**Why left as-is:** Testing tool targets dev/staging environments that commonly use self-signed certs. Strict validation would break a common use case.
-
-**Future:** Make it a per-operation option (`"skipSslVerification": true/false`). Default to `false` (strict) once UI supports it.
-
----
-
-## Very-Future Priority
-
-### Secret Variables
-
-**Files:** `EnvVariable.java`, `EnvVariableRepository.java`, `environments/` frontend
-
-**What:** Environment variables (API keys, passwords, DB credentials) are stored and returned as plain text.
-
-**Future:** Encrypt sensitive values at-rest using AES-GCM with a master key from config (`flowation.secrets.master-key`). Add a `secret: boolean` flag to `EnvVariable`. Secret values are encrypted on write, decrypted on use (execution), and never returned in GET responses (masked as `"***"`). UI shows a lock icon for secret variables.
+**Future:** Make it a per-operation toggle (`skipSslVerification: true/false`). Default to `false` (strict) once the UI supports it.

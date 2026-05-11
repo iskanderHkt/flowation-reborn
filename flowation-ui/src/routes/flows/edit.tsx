@@ -1,8 +1,10 @@
 import { useParams, useNavigate } from '@tanstack/react-router'
-import { useFlow, useFlowSteps, useAddFlowStep, useDeleteFlowStep, useExecuteFlow, useFlowExecutionHistory, useMultipleFlowSteps } from '@/hooks/use-flows.ts'
+import { useFlow, useFlowSteps, useAddFlowStep, useDeleteFlowStep, useStartFlowRun, useFlowExecutionHistory, useMultipleFlowSteps, flowKeys } from '@/hooks/use-flows.ts'
 import { useOperations, useCreateOperation } from '@/hooks/use-operations.ts'
 import { useFlows } from '@/hooks/use-flows.ts'
 import { useEnvironments } from '@/hooks/use-environments.ts'
+import { useQueryClient } from '@tanstack/react-query'
+import { useExecutionStream } from '@/shared/hooks/use-execution-stream.ts'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Badge } from '@/components/ui/badge.tsx'
@@ -14,7 +16,7 @@ import { FlowExecutionPanel } from '@/components/flow-editor/flow-execution-pane
 import { FlowVariablesPanel } from '@/components/flow-editor/flow-variables-panel.tsx'
 import { ResizeHandle } from '@/components/resize-handle.tsx'
 import { ArrowLeft, Play, ChevronRight, ChevronLeft } from 'lucide-react'
-import { useState, useMemo, useCallback } from 'react'
+import {useState, useMemo, useCallback, useEffect} from 'react'
 import type { FlowStepCreateRequest, ExecutionStatus, FlowExecutionResult, OperationConfig, OnFailStrategy } from '@/api/types.ts'
 
 export function FlowEditPage() {
@@ -31,10 +33,13 @@ export function FlowEditPage() {
   const { data: operations = [] } = useOperations()
   const { data: allFlows = [] } = useFlows()
 
+  const qc = useQueryClient()
   const addStepMutation = useAddFlowStep(activeFlowId)
   const deleteStepMutation = useDeleteFlowStep(activeFlowId)
   const createOperationMutation = useCreateOperation()
-  const executeMutation = useExecuteFlow(flowId)
+  const startRunMutation = useStartFlowRun(flowId)
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
+  const stream = useExecutionStream(activeRunId)
   const [historyPageIndex, setHistoryPageIndex] = useState(0)
   const { data: executionHistoryPage } = useFlowExecutionHistory(flowId, historyPageIndex)
 
@@ -64,10 +69,19 @@ export function FlowEditPage() {
   const [rightPanelWidth, setRightPanelWidth] = useState(340)
   const [varsPanelOpen, setVarsPanelOpen] = useState(true)
 
-  // Latest execution result for status coloring
+  // Latest execution result for status coloring — live stream takes priority
   const latestExecution = executionHistoryPage?.content[0] as FlowExecutionResult | undefined
 
   const executionStatuses = useMemo(() => {
+    // While streaming or just completed: show live step statuses from SSE
+    if (stream.isStreaming || stream.runStatus) {
+      const map: Record<string, ExecutionStatus> = {}
+      for (const step of stream.steps) {
+        if (step.stepRefId) map[step.stepRefId] = step.status
+      }
+      return map
+    }
+    // Fallback to latest history entry
     if (!latestExecution) return {}
     const map: Record<string, ExecutionStatus> = {}
     for (const stepResult of latestExecution.steps) {
@@ -76,7 +90,32 @@ export function FlowEditPage() {
       }
     }
     return map
-  }, [latestExecution])
+  }, [stream.isStreaming, stream.runStatus, stream.steps, latestExecution])
+
+  // Build live FlowExecutionResult from stream for the panel
+  const liveResult = useMemo((): FlowExecutionResult | undefined => {
+    if (!stream.isStreaming && !stream.runStatus) return undefined
+    return {
+      runId: activeRunId ?? '',
+      flowId,
+      runMode: 'FLOW',
+      status: stream.runStatus ?? 'RUNNING',
+      startedAt: stream.steps[0]?.startedAt ?? new Date().toISOString(),
+      completedAt: stream.completedAt ?? '',
+      totalDurationMs: stream.totalDurationMs ?? 0,
+      steps: stream.steps.map((s) => ({
+        stepIndex: s.stepIndex,
+        stepRefId: s.stepRefId,
+        status: s.status,
+        requestSnapshot: s.requestSnapshot,
+        responseSnapshot: s.responseSnapshot,
+        errorMessage: s.errorMessage,
+        durationMs: s.durationMs,
+        startedAt: s.startedAt,
+        completedAt: s.completedAt,
+      })),
+    }
+  }, [stream, activeRunId, flowId])
 
   const effectiveFlowId = selectedStepFlowId ?? activeFlowId
 
@@ -165,15 +204,23 @@ export function FlowEditPage() {
 
   const handleRun = useCallback(async () => {
     try {
-      const result = await executeMutation.mutateAsync(selectedEnvId || undefined)
-      toast({
-        title: result.status === 'COMPLETED' ? 'Flow completed' : 'Flow failed',
-        variant: result.status === 'COMPLETED' ? 'success' : 'error',
-      })
+      const { runId } = await startRunMutation.mutateAsync(selectedEnvId || undefined)
+      setActiveRunId(runId)
     } catch (err) {
       toast({ title: 'Execution failed', description: String(err), variant: 'error' })
     }
-  }, [executeMutation, toast])
+  }, [startRunMutation, selectedEnvId, toast])
+
+  // Toast + history invalidation when stream completes
+  useEffect(() => {
+    if (stream.isStreaming || !stream.runStatus || !activeRunId) return
+    toast({
+      title: stream.runStatus === 'COMPLETED' ? 'Flow completed' : 'Flow failed',
+      variant: stream.runStatus === 'COMPLETED' ? 'success' : 'error',
+    })
+    qc.invalidateQueries({ queryKey: flowKeys.executionPage(flowId, historyPageIndex, 20) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.isStreaming])
 
   const handleDrillDown = useCallback((nestedFlowId: string) => {
     const flow = allFlows.find((f) => f.id === nestedFlowId)
@@ -251,11 +298,14 @@ export function FlowEditPage() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {latestExecution && (
-            <Badge variant={latestExecution.status === 'COMPLETED' ? 'success' : latestExecution.status === 'FAILED' ? 'error' : 'muted'}>
-              {latestExecution.status} ({latestExecution.totalDurationMs}ms)
-            </Badge>
-          )}
+          {(liveResult ?? latestExecution) && (() => {
+            const r = liveResult ?? latestExecution!
+            return (
+              <Badge variant={r.status === 'COMPLETED' ? 'success' : r.status === 'FAILED' ? 'error' : 'info'}>
+                {r.status}{r.status !== 'RUNNING' ? ` (${r.totalDurationMs}ms)` : ''}
+              </Badge>
+            )
+          })()}
           {environments.length > 0 && (
             <select
               value={selectedEnvId}
@@ -271,14 +321,14 @@ export function FlowEditPage() {
           <Button
             size="sm"
             onClick={handleRun}
-            disabled={executeMutation.isPending || steps.length === 0}
+            disabled={startRunMutation.isPending || stream.isStreaming || steps.length === 0}
           >
-            {executeMutation.isPending ? (
+            {stream.isStreaming ? (
               <Spinner className="h-3 w-3" />
             ) : (
               <Play size={13} />
             )}
-            Run Flow
+            {stream.isStreaming ? 'Running...' : 'Run Flow'}
           </Button>
         </div>
       </div>
@@ -350,7 +400,7 @@ export function FlowEditPage() {
                   flowId={effectiveFlowId}
                   operations={operations}
                   flows={allFlows}
-                  executionResult={latestExecution?.steps.find((s) => s.stepRefId === selectedStep.id)}
+                  executionResult={(liveResult ?? latestExecution)?.steps.find((s) => s.stepRefId === selectedStep.id)}
                   selectedEnvId={selectedEnvId || undefined}
                   onDelete={selectedStepFlowId ? undefined : () => handleDeleteStep(selectedStep.id)}
                   onDrillDown={handleDrillDown}
@@ -373,7 +423,7 @@ export function FlowEditPage() {
             max={600}
           />
           <FlowExecutionPanel
-            latestResult={latestExecution}
+            latestResult={liveResult ?? latestExecution}
             historyPage={executionHistoryPage}
             historyPageIndex={historyPageIndex}
             onHistoryPageChange={setHistoryPageIndex}

@@ -28,7 +28,7 @@ export const sqlConfigSchema = z.object({
 export const assertConfigSchema = z.object({
   type: z.literal('ASSERTION'),
   expression: z.string().min(1, 'Expression is required'),
-  comparator: z.enum(['EQ', 'NEQ', 'CONTAINS', 'REGEX', 'GT', 'LT', 'IS_NULL']),
+  comparator: z.enum(['EQ', 'NEQ', 'CONTAINS', 'REGEX', 'GT', 'LT', 'IS_NULL', 'IS_NOT_NULL']),
   expected: z.string(),
 })
 

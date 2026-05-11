@@ -15,7 +15,10 @@
       "Bash(curl *)",
       "Read(//c/Users/ialymov/.m2/wrapper/dists/**)",
       "Bash(mvn -v)",
-      "Bash(~/.m2/wrapper/dists/apache-maven-3.9.14/*/apache-maven-3.9.14/bin/mvn -q -o compile)"
+      "Bash(~/.m2/wrapper/dists/apache-maven-3.9.14/*/apache-maven-3.9.14/bin/mvn -q -o compile)",
+      "Bash(xargs grep *)",
+      "Bash(./mvnw compile *)",
+      "Bash(grep -rn 'to=\"/operations/$operationId\"' 'C:\\\\Users\\\\iskaa\\\\OneDrive\\\\Рабочий стол\\\\flowation\\\\flowation-reborn\\\\flowation-ui\\\\src')"
     ]
   },
   "spinnerVerbs": {

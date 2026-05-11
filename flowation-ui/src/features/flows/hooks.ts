@@ -197,6 +197,12 @@ export function useExecuteFlow(flowId: string) {
   })
 }
 
+export function useStartFlowRun(flowId: string) {
+  return useMutation({
+    mutationFn: (environmentId?: string) => flowsApi.startRun(flowId, environmentId),
+  })
+}
+
 export function useFlowExecutionHistory(flowId: string, page = 0, size = 20) {
   return useQuery({
     queryKey: flowKeys.executionPage(flowId, page, size),
