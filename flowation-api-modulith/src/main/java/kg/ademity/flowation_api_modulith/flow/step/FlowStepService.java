@@ -7,10 +7,12 @@ import kg.ademity.flowation_api_modulith.flow.step.dto.request.ReorderEntry;
 import kg.ademity.flowation_api_modulith.catalog.Operation;
 import kg.ademity.flowation_api_modulith.catalog.OperationService;
 import kg.ademity.flowation_api_modulith.catalog.config.OperationConfig;
+import kg.ademity.flowation_api_modulith.shared.CacheNames;
 import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import kg.ademity.flowation_api_modulith.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class FlowStepService {
     private final OperationService operationService;
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public FlowStep addStep(UUID flowId, FlowStepCreateRequest request) {
         // verify flow exists and belongs to current user
         flowService.findById(flowId);
@@ -86,6 +89,7 @@ public class FlowStepService {
         return flowStepRepository.findAllByFlowIdOrderByStepOrder(flowId);
     }
 
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public FlowStep updateStep(UUID flowId, UUID stepId, FlowStepUpdateRequest request) {
         FlowStep step = getStep(flowId, stepId);
 
@@ -113,6 +117,7 @@ public class FlowStepService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public void deleteStep(UUID flowId, UUID stepId) {
         FlowStep step = getStep(flowId, stepId);
         int deletedOrder = step.getStepOrder();
@@ -130,6 +135,7 @@ public class FlowStepService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public void reorderSteps(UUID flowId, List<ReorderEntry> entries) {
         flowService.findById(flowId);
 

@@ -10,4 +10,6 @@ public interface OperationUsagePort {
      * Empty list means the operation can be safely deleted.
      */
     List<String> findLinkedFlowNames(UUID operationId);
+
+    List<UUID> findLinkedFlowIds(UUID operationId);
 }

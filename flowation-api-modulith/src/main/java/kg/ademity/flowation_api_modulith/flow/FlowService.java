@@ -1,8 +1,10 @@
 package kg.ademity.flowation_api_modulith.flow;
 
+import kg.ademity.flowation_api_modulith.shared.CacheNames;
 import kg.ademity.flowation_api_modulith.shared.TenantContext;
 import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -37,6 +39,7 @@ public class FlowService {
         return flowRepository.findAllByOwnerIdAndDeletedAtIsNull(tenantContext.getOwnerId());
     }
 
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#id")
     public Flow update(UUID id, String name, String description) {
         Flow flowFound = flowRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Flow", id));
@@ -53,6 +56,7 @@ public class FlowService {
         return result;
     }
 
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#id")
     public void delete(UUID id) {
         Flow flow = flowRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new NotFoundException("Flow", id));

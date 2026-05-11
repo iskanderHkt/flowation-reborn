@@ -3,8 +3,10 @@ package kg.ademity.flowation_api_modulith.flow.step.extraction;
 import kg.ademity.flowation_api_modulith.flow.step.FlowStepService;
 import kg.ademity.flowation_api_modulith.flow.step.extraction.dto.request.ExtractionRuleCreateRequest;
 import kg.ademity.flowation_api_modulith.flow.step.extraction.dto.request.ExtractionRuleUpdateRequest;
+import kg.ademity.flowation_api_modulith.shared.CacheNames;
 import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +19,7 @@ public class ExtractionRuleService {
     private final ExtractionRuleRepository ruleRepository;
     private final FlowStepService flowStepService;
 
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public ExtractionRule addRule(UUID flowId, UUID stepId, ExtractionRuleCreateRequest request) {
         // verify step exists and belongs to flow
         flowStepService.getStep(flowId, stepId);
@@ -35,6 +38,7 @@ public class ExtractionRuleService {
         return ruleRepository.save(rule);
     }
 
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public ExtractionRule updateRule(UUID flowId, UUID stepId, UUID ruleId, ExtractionRuleUpdateRequest request) {
         // verify step belongs to flow
         flowStepService.getStep(flowId, stepId);
@@ -49,6 +53,7 @@ public class ExtractionRuleService {
         return ruleRepository.save(rule);
     }
 
+    @CacheEvict(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public void deleteRule(UUID flowId, UUID stepId, UUID ruleId) {
         flowStepService.getStep(flowId, stepId);
 

@@ -109,3 +109,79 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 **What:** All HTTPS requests skip certificate validation (trust-all `X509TrustManager`).
 
 **Future:** Make it a per-operation toggle (`skipSslVerification: true/false`). Default to `false` (strict) once the UI supports it.
+
+---
+
+## Backend — Engineering Improvements
+
+Items below have no user-facing urgency but improve correctness, observability, and code clarity. Implement opportunistically.
+
+---
+
+### MDC + traceId в логах
+
+**Files:** `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`, `batch/run/BatchRunService.java`
+
+**What:** Все execution-логи пишутся без correlation ID. При параллельных запросах в логах невозможно отследить какая строка к какому запуску относится.
+
+**Fix:** В начале `execute()` и `runAsync()` писать `MDC.put("executionRunId", run.getId().toString())`, в `finally` — `MDC.clear()`. Добавить `%X{executionRunId}` в паттерн логгера в `application.yaml`. Virtual threads требуют явного `MDC.clear()` — контекст не очищается автоматически при завершении потока.
+
+---
+
+### Strategy реестр для OperationExecutor
+
+**Files:** `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`
+
+**What:** Выбор исполнителя делается через `executors.stream().filter(e -> e.supports(...)).findFirst()` — линейный поиск по списку при каждом шаге каждого execution.
+
+**Fix:** Завести `Map<OperationType, OperationExecutor>` как `@Bean`, собрать через `@Autowired List<OperationExecutor>` в конструкторе. Lookup становится O(1) и явным — сразу видно что для каждого типа ровно один исполнитель.
+
+---
+
+### Spring Events для межмодульного оповещения
+
+**Files:** `execution/flow/FlowExecutionService.java`, `shared/`
+
+**What:** По завершении execution нет никакого события — сервисы которые хотят реагировать (будущая статистика, нотификации, метрики) должны встраиваться прямо в FlowExecutionService.
+
+**Fix:** Опубликовать `FlowExecutionCompletedEvent` через `ApplicationEventPublisher` в конце `execute()`. Слушатель регистрируется через `@EventListener` в отдельном компоненте. Модули не знают друг о друге — классический Observer через Spring.
+
+---
+
+### AOP аспект для аудита execution-запросов
+
+**Files:** `execution/flow/FlowExecutionController.java`, `execution/InstantExecutionController.java`, новый `shared/audit/`
+
+**What:** Нет централизованного логирования входящих execution-запросов: кто, что, когда.
+
+**Fix:** Аннотация `@AuditExecution` + аспект `@Around` на контроллерах. Аспект логирует `ownerId`, `flowId`/`operationId`, время ответа, статус. Никакой бизнес-логики в аспекте — только observability.
+
+---
+
+### @Version — оптимистичная блокировка
+
+**Files:** `flow/Flow.java`, `catalog/Operation.java`
+
+**What:** Два одновременных запроса на редактирование одного flow молча перезаписывают друг друга — last write wins.
+
+**Fix:** Добавить поле `@Version private Long version` на `Flow` и `Operation`. Spring Data JDBC поддерживает это нативно — при конфликте бросает `OptimisticLockingFailureException`, которую `GlobalExceptionHandler` маппит в 409. Добавить колонку `version BIGINT DEFAULT 0` в `db/init.sql`.
+
+---
+
+### CompletableFuture для параллельного batch-выполнения
+
+**Files:** `batch/run/BatchRunService.java`
+
+**What:** Batch в режиме `MULTI` запускает items последовательно в одном потоке. 10 items × 500ms каждый = 5 секунд вместо 500ms.
+
+**Fix:** Для `MULTI`-батчей собрать `List<CompletableFuture<Void>>`, запустить через `Executors.newVirtualThreadPerTaskExecutor()`, дождаться через `CompletableFuture.allOf(...)`. `DATA_DRIVEN` оставить последовательным — там порядок строк важен.
+
+---
+
+### N+1 в JDBC — FlowStepService + ExtractionRuleService
+
+**Files:** `flow/compiler/FlowCompiler.java`
+
+**What:** `compileRecursive` для каждого шага делает отдельный запрос за `ExtractionRule` через `extractionRuleService.getRulesByStepId(stepId)` — N+1 по числу шагов в flow.
+
+**Fix:** Добавить в `ExtractionRuleRepository` метод `findAllByFlowStepIdIn(Collection<UUID> stepIds)`. В `FlowCompiler` собрать все `stepId` за один проход, загрузить все правила одним запросом, раздать по шагам через `Map<UUID, List<ExtractionRule>>`. После внедрения кэша это менее критично, но правильный подход стоит зафиксировать.

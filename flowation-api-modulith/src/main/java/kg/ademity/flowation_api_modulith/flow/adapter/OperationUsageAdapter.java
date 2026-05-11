@@ -31,4 +31,14 @@ public class OperationUsageAdapter implements OperationUsagePort {
                 .map(Flow::getName)
                 .toList();
     }
+
+    @Override
+    public List<UUID> findLinkedFlowIds(UUID operationId) {
+        return flowStepRepository
+                .findAllByOperationIdAndBinding(operationId, Binding.LINKED)
+                .stream()
+                .map(FlowStep::getFlowId)
+                .distinct()
+                .toList();
+    }
 }

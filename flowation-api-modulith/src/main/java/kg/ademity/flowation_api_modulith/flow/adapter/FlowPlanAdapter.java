@@ -8,7 +8,9 @@ import kg.ademity.flowation_api_modulith.flow.compiler.FlowCompiler;
 import kg.ademity.flowation_api_modulith.flow.step.FlowStep;
 import kg.ademity.flowation_api_modulith.flow.step.FlowStepService;
 import kg.ademity.flowation_api_modulith.flow.step.StepKind;
+import kg.ademity.flowation_api_modulith.shared.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,6 +28,7 @@ public class FlowPlanAdapter implements FlowPlanPort {
     private final FlowStepService flowStepService;
 
     @Override
+    @Cacheable(value = CacheNames.COMPILED_FLOWS, key = "#flowId")
     public List<CompiledStep> compilePlan(UUID flowId) {
         Flow flow = flowService.findById(flowId);
         return flowCompiler.compile(flow);

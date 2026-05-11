@@ -15,6 +15,6 @@ public class BatchExecutorConfig {
      */
     @Bean(name = "batchExecutor")
     public ExecutorService batchExecutor() {
-        return Executors.newFixedThreadPool(10, Thread.ofVirtual().factory());
+        return Executors.newVirtualThreadPerTaskExecutor();
     }
 }

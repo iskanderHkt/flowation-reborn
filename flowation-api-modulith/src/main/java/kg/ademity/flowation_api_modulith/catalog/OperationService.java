@@ -2,18 +2,17 @@ package kg.ademity.flowation_api_modulith.catalog;
 
 import kg.ademity.flowation_api_modulith.catalog.config.OperationConfig;
 import kg.ademity.flowation_api_modulith.catalog.port.OperationUsagePort;
+import kg.ademity.flowation_api_modulith.shared.CacheNames;
 import kg.ademity.flowation_api_modulith.shared.TenantContext;
 import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import kg.ademity.flowation_api_modulith.shared.exception.ValidationException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +20,7 @@ public class OperationService {
     private final OperationRepository repository;
     private final OperationUsagePort operationUsagePort;
     private final TenantContext tenantContext;
+    private final CacheManager cacheManager;
 
     public Operation create(String name, OperationConfig config, UUID groupId) {
         Operation operationToCreate = Operation.builder()
@@ -55,7 +55,13 @@ public class OperationService {
         operationFound.setGroupId(groupId);
         operationFound.setUpdatedAt(Instant.now());
 
-        return repository.save(operationFound);
+        Operation saved = repository.save(operationFound);
+
+        Cache cache = cacheManager.getCache(CacheNames.COMPILED_FLOWS);
+        operationUsagePort.findLinkedFlowIds(operationId)
+                .forEach(Objects.requireNonNull(cache)::evict);
+
+        return saved;
     }
 
     public Map<UUID, String> resolveNames(Set<UUID> ids) {
