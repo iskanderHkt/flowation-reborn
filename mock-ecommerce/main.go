@@ -3,8 +3,10 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -144,8 +146,22 @@ func router(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func main() {
-	dsn := "host=localhost port=5433 user=ecom_user password=ecom_password dbname=ecommerce sslmode=disable"
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		getEnv("DB_HOST", "localhost"),
+		getEnv("DB_PORT", "5433"),
+		getEnv("DB_USER", "ecom_user"),
+		getEnv("DB_PASSWORD", "ecom_password"),
+		getEnv("DB_NAME", "ecommerce"),
+	)
 	var err error
 	db, err = sql.Open("postgres", dsn)
 	if err != nil {

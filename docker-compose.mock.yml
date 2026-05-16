@@ -19,5 +19,20 @@ services:
       timeout: 5s
       retries: 5
 
+  mock-api:
+    build: ./mock-ecommerce
+    container_name: mock-api
+    environment:
+      DB_HOST: mock-postgres
+      DB_PORT: 5432
+      DB_USER: ecom_user
+      DB_PASSWORD: ecom_password
+      DB_NAME: ecommerce
+    ports:
+      - "8081:8081"
+    depends_on:
+      mock-postgres:
+        condition: service_healthy
+
 volumes:
   mock_postgres_data:

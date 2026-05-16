@@ -7,16 +7,31 @@ Ordered by when each item needs to land. Done items kept for reference.
 ## ✅ Done
 
 ### SSE Execution Progress ✅
-
 Async execution for flows and operations (`POST /runs` → 202 + runId), SSE stream `GET /api/executions/{runId}/stream` with `step-completed` + `run-completed` events. Batch SSE: `GET /api/batches/{batchId}/runs/{runId}/stream` with `item-completed` + `run-completed`. Frontend fully migrated — all three pages (operations, flows, batch) use SSE, polling removed.
 
 ### Executions Page ✅
-
 `/executions` route with unified history across all operations, flows, and batches. Filterable by type and status, paginated.
 
 ### Operation Groups (Catalog Organization) ✅
-
 Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group column, group filter select, and inline groups manager. Operation form has group selector.
+
+### Strategy Registry для OperationExecutor ✅
+`OperationExecutorRegistry` — `EnumMap<OperationType, OperationExecutor>`, lookup O(1). Используется в `FlowExecutionService` и `InstantExecutionService`.
+
+### @Version — оптимистичная блокировка ✅
+`@Version Long version` на `Flow` и `Operation`. `OptimisticLockingFailureException` → 409 в `GlobalExceptionHandler`. Колонка `version BIGINT DEFAULT 0` в схеме.
+
+### CompletableFuture для параллельного batch-выполнения ✅
+`BatchRunService` использует `CompletableFuture.supplyAsync()` через `batchExecutor` (`newVirtualThreadPerTaskExecutor()`). MULTI батчи выполняются параллельно. DATA_DRIVEN — последовательно (порядок строк важен).
+
+### N+1 в FlowCompiler ✅
+3-фазная компиляция: collect steps → bulk load rules (`findAllByFlowStepIdIn`) → assemble. Один запрос вместо N.
+
+### Unit Tests — FlowCompiler ✅
+3 теста: два LINKED шага, вложенный флоу, превышение maxNestingDepth.
+
+### Integration Tests — базовая инфраструктура ✅
+Testcontainers + PostgreSQL, `AbstractIntegrationTest`, Flyway миграция в test resources, `application-test.yaml`. Первый тест: `ExtractionRuleRepositoryIT`.
 
 ---
 
@@ -26,9 +41,12 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 **Files:** `docker-compose.mock.yml`, `mock-api/main.go`
 
-**What:** `docker-compose.mock.yml` only spins up Postgres. The mock API lives separately and hardcodes `localhost:5433` in `main.go`. No single command brings up a full working environment for demos or self-testing.
+**Проблема:** `docker-compose.mock.yml` поднимает только Postgres. Mock API живёт отдельно и хардкодит `localhost:5433`. Единой команды для запуска всего окружения нет.
 
-**Fix:** Add the mock API as a service in `docker-compose.mock.yml`. Parameterize the DB address in `main.go` via env var. Verify `docker compose -f docker-compose.mock.yml up` starts everything needed to run the app end-to-end.
+**Подзадачи:**
+- Добавить mock API как сервис в `docker-compose.mock.yml`
+- Параметризовать адрес БД в `main.go` через env var (`DB_HOST`, `DB_PORT`)
+- Проверить что `docker compose -f docker-compose.mock.yml up` поднимает всё необходимое для e2e демо
 
 ---
 
@@ -36,21 +54,29 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 ### Deployment Configuration & CI/CD
 
-**Files:** `application.yaml`, no `application-prod.yaml` exists, no `Dockerfile`
+**Files:** `application.yaml`, нет `application-prod.yaml`, нет `Dockerfile`
 
-**What:** DB credentials hardcoded, no production profile, app not containerized. Irrelevant until a real server exists.
+**Проблема:** Credentials захардкожены, prod профиля нет, приложение не контейнеризовано.
 
-**Fix:** Add `application-prod.yaml` with env-variable substitution (`${DB_URL}`, `${DB_USER}`, `${DB_PASS}`). Enable Flyway for prod. Add `Dockerfile` for the app. Update `docker-compose.yml` with app + frontend services. Set up CI/CD pipeline.
+**Подзадачи:**
+- Создать `application-prod.yaml` с env-variable substitution (`${DB_URL}`, `${DB_USER}`, `${DB_PASS}`, `${DB_DRIVER}`)
+- Включить Flyway в prod профиле (`spring.flyway.enabled: true`)
+- Написать `Dockerfile` для Spring Boot приложения (multi-stage: build + runtime)
+- Обновить `docker-compose.yml` — добавить сервисы app и frontend
+- Настроить CI/CD pipeline (GitHub Actions): build → test → docker push → deploy
 
 ---
 
 ### SSE Polling Optimization
 
-**Files:** `execution/stream/ExecutionStreamService.java`, `batch/run/BatchRunStreamService.java`, `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`
+**Files:** `execution/stream/ExecutionStreamService.java`, `batch/run/BatchRunStreamService.java`, `execution/flow/FlowExecutionService.java`
 
-**What:** SSE is implemented via DB polling every 300ms. Async jobs start with `Thread.ofVirtual().start(...)` — no bounded executor, no backpressure.
+**Проблема:** SSE реализован через DB polling каждые 300ms. `FlowExecutionService.startAsync()` запускает виртуальный поток через `Thread.ofVirtual().start()` — без ограничения параллелизма.
 
-**Future:** Introduce a bounded `ExecutorService` with a configured thread pool for async execution. Add backpressure or a simple task queue before scaling to multi-user load.
+**Подзадачи:**
+- Перенести `startAsync()` в `FlowExecutionService` на `ExecutorService` (аналогично BatchRunService)
+- Рассмотреть замену DB polling на Spring Events (`@EventListener`) для SSE push — убирает задержку 300ms
+- Добавить backpressure перед масштабированием на многопользовательскую нагрузку
 
 ---
 
@@ -58,17 +84,24 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 **Files:** `hooks/use-all-executions.ts`
 
-**What:** The executions page fans out to all entity endpoints individually from the frontend. As data volume grows this will be the first thing that gets noisy.
+**Проблема:** Страница executions делает fan-out к нескольким эндпоинтам с фронтенда. При росте данных станет шумным.
 
-**Future:** Add a backend `GET /api/executions` endpoint that returns a unified, paginated list across flows, operations, and batches, filterable by type/status. Replace the frontend fan-out with a single query.
+**Подзадачи:**
+- Добавить `GET /api/executions` — единый пагинированный список по всем типам (flow, operation, batch)
+- Поддержать фильтрацию по `type` и `status` на стороне БД
+- Заменить frontend fan-out на один запрос
 
 ---
 
-### Tests
+### Tests — расширение покрытия
 
-**What:** Backend has only the Spring Boot context test. No service or integration tests. No frontend tests at all.
+**Проблема:** Сейчас покрыты только `FlowCompiler` (unit) и `ExtractionRuleRepository` (integration). Execution и batch пути не покрыты.
 
-**Future:** Backend: integration tests for at least the execution and batch paths against a real Postgres (Testcontainers). Frontend: component tests for the flow editor and execution stream hook.
+**Подзадачи:**
+- Integration тест для `FlowService` — CRUD через реальную БД
+- Integration тест для `FlowCompiler` — компиляция флоу с реальными данными в БД
+- Integration тест для execution пути — `FlowExecutionService` с моком HTTP executor
+- Frontend: component тесты для flow editor и execution stream hook
 
 ---
 
@@ -78,9 +111,12 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 **Files:** `shared/TenantContext.java`, `shared/DevContext.java`
 
-**What:** `DevContext` always returns a hardcoded owner UUID. No authentication, no user accounts, no isolation between users.
+**Проблема:** `DevContext` всегда возвращает хардкоженый UUID. Нет аутентификации и изоляции между пользователями.
 
-**Future:** Replace `DevContext` with JWT-based `TenantContext`. Add `findByIdAndOwnerId` variants in all repositories. Consider object-level ACLs (share a flow with another user, read-only vs edit).
+**Подзадачи:**
+- Реализовать JWT-based `TenantContext` — извлекать `ownerId` из токена
+- Добавить `findByIdAndOwnerId` варианты во все репозитории
+- Закрыть `DevContext` профилем `dev` чтобы не попал в prod
 
 ---
 
@@ -88,17 +124,26 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 **Files:** `EnvironmentService`, `FlowService`, `OperationService`, `BatchService`
 
-**What:** `findById(UUID id)` queries by ID only, without filtering by `ownerId`. Resolves alongside the Auth item above.
+**Проблема:** `findById(UUID id)` ищет только по ID без проверки `ownerId` — любой пользователь может обратиться к чужому ресурсу.
+
+**Подзадачи:**
+- Во всех сервисах заменить `findById` на `findByIdAndOwnerId`
+- Добавить соответствующие методы в репозитории
+- Решается одновременно с Auth задачей выше
 
 ---
 
 ### Secret Variables
 
-**Files:** `EnvVariable.java`, `EnvironmentService.java`, environments frontend
+**Files:** `EnvVariable.java`, `EnvironmentService.java`
 
-**What:** Environment variables (API keys, passwords, DB credentials) are stored and returned as plain text.
+**Проблема:** API ключи и пароли хранятся и возвращаются plaintext.
 
-**Future:** Encrypt sensitive values at-rest using AES-GCM with a master key from config. Add a `secret: boolean` flag to `EnvVariable`. Secret values are encrypted on write, decrypted on use, never returned in GET responses (masked as `"***"`).
+**Подзадачи:**
+- Добавить поле `secret: boolean` на `EnvVariable`
+- Шифровать значение при записи (AES-GCM, master key из конфига)
+- Дешифровать при использовании в execution context
+- В GET ответах возвращать `"***"` для secret переменных — никогда не отдавать plaintext
 
 ---
 
@@ -106,15 +151,18 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 **File:** `HttpOperationExecutor.java` — `buildTrustAllSslContext()`
 
-**What:** All HTTPS requests skip certificate validation (trust-all `X509TrustManager`).
+**Проблема:** Все HTTPS запросы пропускают проверку сертификата (trust-all).
 
-**Future:** Make it a per-operation toggle (`skipSslVerification: true/false`). Default to `false` (strict) once the UI supports it.
+**Подзадачи:**
+- Добавить поле `skipSslVerification: boolean` в `HttpOperationConfig` (default `false`)
+- В UI добавить тоггл на форме HTTP операции
+- `buildTrustAllSslContext()` использовать только когда флаг явно включён
 
 ---
 
 ## Backend — Engineering Improvements
 
-Items below have no user-facing urgency but improve correctness, observability, and code clarity. Implement opportunistically.
+Нет user-facing urgency, но улучшают observability и качество кода. Делать opportunistically.
 
 ---
 
@@ -122,29 +170,27 @@ Items below have no user-facing urgency but improve correctness, observability, 
 
 **Files:** `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`, `batch/run/BatchRunService.java`
 
-**What:** Все execution-логи пишутся без correlation ID. При параллельных запросах в логах невозможно отследить какая строка к какому запуску относится.
+**Проблема:** Execution логи пишутся без correlation ID. При параллельных запусках невозможно отследить какая строка к какому запуску относится.
 
-**Fix:** В начале `execute()` и `runAsync()` писать `MDC.put("executionRunId", run.getId().toString())`, в `finally` — `MDC.clear()`. Добавить `%X{executionRunId}` в паттерн логгера в `application.yaml`. Virtual threads требуют явного `MDC.clear()` — контекст не очищается автоматически при завершении потока.
-
----
-
-### Strategy реестр для OperationExecutor
-
-**Files:** `execution/flow/FlowExecutionService.java`, `execution/InstantExecutionService.java`
-
-**What:** Выбор исполнителя делается через `executors.stream().filter(e -> e.supports(...)).findFirst()` — линейный поиск по списку при каждом шаге каждого execution.
-
-**Fix:** Завести `Map<OperationType, OperationExecutor>` как `@Bean`, собрать через `@Autowired List<OperationExecutor>` в конструкторе. Lookup становится O(1) и явным — сразу видно что для каждого типа ровно один исполнитель.
+**Подзадачи:**
+- В начале `execute()` и `runAsync()` писать `MDC.put("runId", run.getId().toString())`
+- В `finally` блоке — `MDC.clear()` (обязательно для virtual threads — контекст не очищается автоматически)
+- Добавить `%X{runId}` в паттерн логгера в `application.yaml`
+- Проверить что в BatchRunService MDC проброшен в дочерние потоки (virtual threads не наследуют MDC автоматически)
 
 ---
 
 ### Spring Events для межмодульного оповещения
 
-**Files:** `execution/flow/FlowExecutionService.java`, `shared/`
+**Files:** `execution/flow/FlowExecutionService.java`, новый `execution/event/`
 
-**What:** По завершении execution нет никакого события — сервисы которые хотят реагировать (будущая статистика, нотификации, метрики) должны встраиваться прямо в FlowExecutionService.
+**Проблема:** По завершении execution нет события. Будущие модули (статистика, нотификации, метрики) вынуждены встраиваться прямо в FlowExecutionService.
 
-**Fix:** Опубликовать `FlowExecutionCompletedEvent` через `ApplicationEventPublisher` в конце `execute()`. Слушатель регистрируется через `@EventListener` в отдельном компоненте. Модули не знают друг о друге — классический Observer через Spring.
+**Подзадачи:**
+- Создать `FlowExecutionCompletedEvent` record с `runId`, `flowId`, `status`, `durationMs`
+- Опубликовать через `ApplicationEventPublisher` в конце `execute()`
+- Аналогично для `InstantExecutionService` — `OperationExecutionCompletedEvent`
+- Написать пример слушателя `@EventListener` чтобы паттерн был понятен
 
 ---
 
@@ -152,36 +198,10 @@ Items below have no user-facing urgency but improve correctness, observability, 
 
 **Files:** `execution/flow/FlowExecutionController.java`, `execution/InstantExecutionController.java`, новый `shared/audit/`
 
-**What:** Нет централизованного логирования входящих execution-запросов: кто, что, когда.
+**Проблема:** Нет централизованного логирования входящих execution-запросов.
 
-**Fix:** Аннотация `@AuditExecution` + аспект `@Around` на контроллерах. Аспект логирует `ownerId`, `flowId`/`operationId`, время ответа, статус. Никакой бизнес-логики в аспекте — только observability.
-
----
-
-### @Version — оптимистичная блокировка
-
-**Files:** `flow/Flow.java`, `catalog/Operation.java`
-
-**What:** Два одновременных запроса на редактирование одного flow молча перезаписывают друг друга — last write wins.
-
-**Fix:** Добавить поле `@Version private Long version` на `Flow` и `Operation`. Spring Data JDBC поддерживает это нативно — при конфликте бросает `OptimisticLockingFailureException`, которую `GlobalExceptionHandler` маппит в 409. Добавить колонку `version BIGINT DEFAULT 0` в `db/init.sql`.
-
----
-
-### CompletableFuture для параллельного batch-выполнения
-
-**Files:** `batch/run/BatchRunService.java`
-
-**What:** Batch в режиме `MULTI` запускает items последовательно в одном потоке. 10 items × 500ms каждый = 5 секунд вместо 500ms.
-
-**Fix:** Для `MULTI`-батчей собрать `List<CompletableFuture<Void>>`, запустить через `Executors.newVirtualThreadPerTaskExecutor()`, дождаться через `CompletableFuture.allOf(...)`. `DATA_DRIVEN` оставить последовательным — там порядок строк важен.
-
----
-
-### N+1 в JDBC — FlowStepService + ExtractionRuleService
-
-**Files:** `flow/compiler/FlowCompiler.java`
-
-**What:** `compileRecursive` для каждого шага делает отдельный запрос за `ExtractionRule` через `extractionRuleService.getRulesByStepId(stepId)` — N+1 по числу шагов в flow.
-
-**Fix:** Добавить в `ExtractionRuleRepository` метод `findAllByFlowStepIdIn(Collection<UUID> stepIds)`. В `FlowCompiler` собрать все `stepId` за один проход, загрузить все правила одним запросом, раздать по шагам через `Map<UUID, List<ExtractionRule>>`. После внедрения кэша это менее критично, но правильный подход стоит зафиксировать.
+**Подзадачи:**
+- Создать аннотацию `@AuditExecution`
+- Реализовать `@Around` аспект: логировать `ownerId`, `flowId`/`operationId`, время ответа, HTTP статус
+- Навесить `@AuditExecution` на методы контроллеров
+- Никакой бизнес-логики в аспекте — только observability
