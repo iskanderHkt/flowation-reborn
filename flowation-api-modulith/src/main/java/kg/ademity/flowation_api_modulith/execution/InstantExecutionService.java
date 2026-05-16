@@ -4,6 +4,7 @@ import kg.ademity.flowation_api_modulith.catalog.Operation;
 import kg.ademity.flowation_api_modulith.execution.dto.ExecutionResultResponse;
 import kg.ademity.flowation_api_modulith.execution.exception.StepExecutionException;
 import kg.ademity.flowation_api_modulith.execution.executor.OperationExecutor;
+import kg.ademity.flowation_api_modulith.execution.executor.OperationExecutorRegistry;
 import kg.ademity.flowation_api_modulith.execution.executor.StepResult;
 import kg.ademity.flowation_api_modulith.execution.port.EnvContextPort;
 import kg.ademity.flowation_api_modulith.execution.port.OperationPort;
@@ -30,7 +31,7 @@ public class InstantExecutionService {
     private final EnvContextPort envContextPort;
     private final ExecutionRunRepository executionRunRepository;
     private final ExecutionStepResultRepository stepResultRepository;
-    private final List<OperationExecutor> executors;
+    private final OperationExecutorRegistry executorRegistry;
     private final TenantContext tenantContext;
 
     public ExecutionResultResponse execute(UUID operationId, UUID environmentId) {
@@ -51,10 +52,7 @@ public class InstantExecutionService {
                 .createdAt(Instant.now())
                 .build());
 
-        OperationExecutor executor = executors.stream()
-                .filter(e -> e.supports(operation.getType()))
-                .findFirst()
-                .orElseThrow(() -> new StepExecutionException("No executor found for type: " + operation.getType()));
+        OperationExecutor executor = executorRegistry.get(operation.getType());
 
         // env variables as base, input variables override on top
         Map<String, Object> context = new HashMap<>(envContextPort.loadContext(environmentId));
@@ -138,10 +136,7 @@ public class InstantExecutionService {
         run.setStartedAt(Instant.now());
         executionRunRepository.save(run);
 
-        OperationExecutor executor = executors.stream()
-                .filter(e -> e.supports(operation.getType()))
-                .findFirst()
-                .orElseThrow(() -> new StepExecutionException("No executor found for type: " + operation.getType()));
+        OperationExecutor executor = executorRegistry.get(operation.getType());
 
         Map<String, Object> context = new HashMap<>(envContextPort.loadContext(environmentId));
         context.putAll(inputVariables);

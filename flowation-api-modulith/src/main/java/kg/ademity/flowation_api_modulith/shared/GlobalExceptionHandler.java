@@ -4,6 +4,7 @@ import kg.ademity.flowation_api_modulith.execution.exception.StepExecutionExcept
 import kg.ademity.flowation_api_modulith.flow.compiler.FlowCompilationException;
 import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import kg.ademity.flowation_api_modulith.shared.exception.ValidationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,6 +34,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(StepExecutionException.class)
     public ResponseEntity<Map<String, Object>> handleStepExecution(StepExecutionException ex) {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "EXECUTION_ERROR", ex.getMessage());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLock(OptimisticLockingFailureException ex) {
+        return error(HttpStatus.CONFLICT, "CONFLICT", "Resource was modified by another request. Please reload and try again.");
     }
 
     @ExceptionHandler(RuntimeException.class)

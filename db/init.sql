@@ -35,6 +35,7 @@ CREATE TABLE operations (
     name            VARCHAR(255) NOT NULL,
     type            VARCHAR(20) NOT NULL,
     config_template JSONB NOT NULL,
+    version         BIGINT NOT NULL DEFAULT 0,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at      TIMESTAMPTZ
@@ -53,6 +54,7 @@ CREATE TABLE flows (
     owner_id    UUID NOT NULL REFERENCES users(id),
     name        VARCHAR(255) NOT NULL,
     description TEXT,
+    version     BIGINT NOT NULL DEFAULT 0,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at  TIMESTAMPTZ

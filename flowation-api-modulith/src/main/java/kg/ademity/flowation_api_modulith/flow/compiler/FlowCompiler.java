@@ -8,14 +8,15 @@ import kg.ademity.flowation_api_modulith.flow.step.extraction.ExtractionRuleServ
 import kg.ademity.flowation_api_modulith.catalog.Operation;
 import kg.ademity.flowation_api_modulith.catalog.OperationService;
 import kg.ademity.flowation_api_modulith.catalog.config.OperationConfig;
-import kg.ademity.flowation_api_modulith.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -30,41 +31,43 @@ public class FlowCompiler {
     private final ExtractionRuleService extractionRuleService;
 
     public List<CompiledStep> compile(Flow flow) {
-        List<CompiledStep> steps = new ArrayList<>();
-        compileRecursive(flow, steps, 0);
-        return steps;
+        // Phase 1: collect all operation steps in execution order (recursive, flattened)
+        List<FlowStep> operationSteps = new ArrayList<>();
+        collectOperationSteps(flow, operationSteps, 0);
+
+        // Phase 2: bulk load all extraction rules — 1 query instead of N
+        List<UUID> stepIds = operationSteps.stream().map(FlowStep::getId).toList();
+        Map<UUID, List<ExtractionRule>> rulesByStepId = extractionRuleService.getRulesByStepIds(stepIds);
+
+        // Phase 3: assemble CompiledStep list
+        List<CompiledStep> compiled = new ArrayList<>();
+        for (FlowStep step : operationSteps) {
+            Operation operation = step.getBinding() == Binding.LINKED
+                    ? operationService.findById(step.getOperationId())
+                    : null;
+            OperationConfig config = resolveConfig(step, operation);
+            String name = resolveOperationName(step, operation);
+            List<ExtractionRule> rules = rulesByStepId.getOrDefault(step.getId(), List.of());
+            compiled.add(new CompiledStep(compiled.size(), step.getId(), name, config.type(), config, step.getOnFail(), rules));
+        }
+        return compiled;
     }
 
-    private void compileRecursive(Flow flow, List<CompiledStep> steps, int depth) {
+    /**
+     * Recursively walks the flow tree and collects all OPERATION_STEP entries in execution order.
+     * FLOW_STEP entries are resolved into their nested steps — they never appear in the result.
+     */
+    private void collectOperationSteps(Flow flow, List<FlowStep> result, int depth) {
         if (depth > maxNestingDepth) {
             throw new FlowCompilationException(
                     "Maximum nesting depth of " + maxNestingDepth + " exceeded at flow: " + flow.getName());
         }
-
-        List<FlowStep> flowSteps = flowStepService.getAllSteps(flow.getId());
-
-        for (FlowStep flowStep : flowSteps) {
-            if (flowStep.getStepKind() == StepKind.FLOW_STEP) {
-                Flow nestedFlow = flowService.findById(flowStep.getNestedFlowId());
-                compileRecursive(nestedFlow, steps, depth + 1);
+        for (FlowStep step : flowStepService.getAllSteps(flow.getId())) {
+            if (step.getStepKind() == StepKind.FLOW_STEP) {
+                Flow nestedFlow = flowService.findById(step.getNestedFlowId());
+                collectOperationSteps(nestedFlow, result, depth + 1);
             } else {
-                // load operation once — used by both config resolution and name resolution
-                Operation operation = flowStep.getBinding() == Binding.LINKED
-                        ? operationService.findById(flowStep.getOperationId())
-                        : null;
-                OperationConfig config = resolveConfig(flowStep, operation);
-                String operationName = resolveOperationName(flowStep, operation);
-                List<ExtractionRule> rules = extractionRuleService.getRulesByStepId(flowStep.getId());
-
-                steps.add(new CompiledStep(
-                        steps.size(),
-                        flowStep.getId(),
-                        operationName,
-                        config.type(),
-                        config,
-                        flowStep.getOnFail(),
-                        rules
-                ));
+                result.add(step);
             }
         }
     }

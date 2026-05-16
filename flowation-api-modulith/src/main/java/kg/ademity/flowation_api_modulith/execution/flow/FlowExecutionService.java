@@ -5,6 +5,7 @@ import kg.ademity.flowation_api_modulith.execution.dto.FlowExecutionResultRespon
 import kg.ademity.flowation_api_modulith.execution.dto.StepResultResponse;
 import kg.ademity.flowation_api_modulith.execution.exception.StepExecutionException;
 import kg.ademity.flowation_api_modulith.execution.executor.OperationExecutor;
+import kg.ademity.flowation_api_modulith.execution.executor.OperationExecutorRegistry;
 import kg.ademity.flowation_api_modulith.execution.executor.StepResult;
 import kg.ademity.flowation_api_modulith.execution.port.EnvContextPort;
 import kg.ademity.flowation_api_modulith.execution.port.FlowPlanPort;
@@ -30,7 +31,7 @@ public class FlowExecutionService {
     private final EnvContextPort envContextPort;
     private final ExecutionRunRepository runRepository;
     private final ExecutionStepResultRepository stepResultRepository;
-    private final List<OperationExecutor> executors;
+    private final OperationExecutorRegistry executorRegistry;
     private final TenantContext tenantContext;
 
     public FlowExecutionResultResponse execute(UUID flowId, UUID environmentId) {
@@ -82,11 +83,7 @@ public class FlowExecutionService {
                     continue;
                 }
 
-                OperationExecutor executor = executors.stream()
-                        .filter(e -> e.supports(compiledStep.operationType()))
-                        .findFirst()
-                        .orElseThrow(() -> new StepExecutionException(
-                                "No executor for type: " + compiledStep.operationType()));
+                OperationExecutor executor = executorRegistry.get(compiledStep.operationType());
 
                 Instant stepStart = Instant.now();
                 StepResult result = executor.executeRaw(compiledStep.mergedConfig(), runtimeContext);
@@ -170,10 +167,7 @@ public class FlowExecutionService {
         CompiledStep compiled = flowPlanPort.compileStep(flowId, stepId)
                 .orElseThrow(() -> new ValidationException("Cannot compile step " + stepId));
 
-        OperationExecutor executor = executors.stream()
-                .filter(e -> e.supports(compiled.operationType()))
-                .findFirst()
-                .orElseThrow(() -> new StepExecutionException("No executor for type: " + compiled.operationType()));
+        OperationExecutor executor = executorRegistry.get(compiled.operationType());
 
         Map<String, Object> runtimeContext = new HashMap<>(envContextPort.loadContext(environmentId));
         Instant start = Instant.now();
@@ -292,11 +286,7 @@ public class FlowExecutionService {
                     continue;
                 }
 
-                OperationExecutor executor = executors.stream()
-                        .filter(e -> e.supports(compiledStep.operationType()))
-                        .findFirst()
-                        .orElseThrow(() -> new StepExecutionException(
-                                "No executor for type: " + compiledStep.operationType()));
+                OperationExecutor executor = executorRegistry.get(compiledStep.operationType());
 
                 Instant stepStart = Instant.now();
                 StepResult result = executor.executeRaw(compiledStep.mergedConfig(), runtimeContext);

@@ -22,16 +22,6 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 
 ## Before Alpha — must land before any real deployment
 
-### Deployment Configuration
-
-**Files:** `application.yaml`, no `application-prod.yaml` exists
-
-**What:** DB URL, username, and password are hardcoded in `application.yaml`. `flyway.enabled: false`. No production profile.
-
-**Fix:** Add `application-prod.yaml` with env-variable substitution (`${DB_URL}`, `${DB_USER}`, `${DB_PASS}`). Enable Flyway for prod. Document required env vars in README.
-
----
-
 ### Mock Stand (One-Command Setup)
 
 **Files:** `docker-compose.mock.yml`, `mock-api/main.go`
@@ -43,6 +33,16 @@ Full CRUD for groups. `group_id` FK on `operations`. Catalog page shows group co
 ---
 
 ## On Alpha — address during early usage phase
+
+### Deployment Configuration & CI/CD
+
+**Files:** `application.yaml`, no `application-prod.yaml` exists, no `Dockerfile`
+
+**What:** DB credentials hardcoded, no production profile, app not containerized. Irrelevant until a real server exists.
+
+**Fix:** Add `application-prod.yaml` with env-variable substitution (`${DB_URL}`, `${DB_USER}`, `${DB_PASS}`). Enable Flyway for prod. Add `Dockerfile` for the app. Update `docker-compose.yml` with app + frontend services. Set up CI/CD pipeline.
+
+---
 
 ### SSE Polling Optimization
 

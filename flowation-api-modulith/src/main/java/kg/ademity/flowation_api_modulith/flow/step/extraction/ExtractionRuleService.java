@@ -9,8 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -66,5 +66,17 @@ public class ExtractionRuleService {
 
     public List<ExtractionRule> getRulesByStepId(UUID stepId) {
         return ruleRepository.findAllByFlowStepIdOrderByRuleOrder(stepId);
+    }
+
+    /**
+     * Bulk load — one query for all step IDs instead of N queries.
+     * Returns map: stepId → rules (sorted by ruleOrder in memory).
+     */
+    public Map<UUID, List<ExtractionRule>> getRulesByStepIds(Collection<UUID> stepIds) {
+        if (stepIds.isEmpty()) return Map.of();
+        return ruleRepository.findAllByFlowStepIdIn(stepIds)
+                .stream()
+                .sorted(Comparator.comparingInt(ExtractionRule::getRuleOrder))
+                .collect(Collectors.groupingBy(ExtractionRule::getFlowStepId));
     }
 }
