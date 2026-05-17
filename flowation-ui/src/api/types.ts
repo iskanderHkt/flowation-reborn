@@ -305,3 +305,36 @@ export interface FlowExecutionResult {
   totalDurationMs: number
   steps: StepResultResponse[]
 }
+
+/* ── Schedule Types ───────────────────────────────── */
+
+export type TargetType = 'OPERATION' | 'FLOW' | 'BATCH'
+export type ScheduleStatus = 'ACTIVE' | 'PAUSED'
+
+export interface Schedule {
+  id: string
+  targetType: TargetType
+  targetId: string
+  targetName: string
+  environmentId: string | null
+  cronExpression: string
+  status: ScheduleStatus
+  description: string | null
+  nextFireTime: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ScheduleCreateRequest {
+  targetType: TargetType
+  targetId: string
+  environmentId: string | null
+  cronExpression: string
+  description: string | null
+}
+
+export interface ScheduleUpdateRequest {
+  environmentId: string | null
+  cronExpression: string
+  description: string | null
+}

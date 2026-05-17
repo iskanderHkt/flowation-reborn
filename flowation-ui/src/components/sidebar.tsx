@@ -6,6 +6,7 @@ import {
   Globe,
   Layers,
   History,
+  CalendarClock,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/environments', label: 'Environments', icon: Globe },
   { to: '/batch', label: 'Batch', icon: Layers },
   { to: '/executions', label: 'Executions', icon: History },
+  { to: '/schedules', label: 'Schedules', icon: CalendarClock },
 ]
 
 export function Sidebar() {

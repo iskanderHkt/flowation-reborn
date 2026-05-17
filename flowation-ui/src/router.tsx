@@ -20,6 +20,7 @@ import { EnvironmentEditPage } from '@/routes/environments/edit.tsx'
 import { BatchPage } from '@/routes/batch/index.tsx'
 import { BatchNewPage } from '@/routes/batch/new.tsx'
 import { ExecutionsPage } from '@/routes/executions/index.tsx'
+import { SchedulesPage } from '@/routes/schedules/index.tsx'
 
 // Heavy routes — lazy loaded (CodeMirror + ReactFlow)
 const OperationEditPage = lazy(() =>
@@ -194,6 +195,16 @@ const executionsRoute = createRoute({
   ),
 })
 
+const schedulesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/schedules',
+  component: () => (
+    <ErrorBoundary>
+      <SchedulesPage />
+    </ErrorBoundary>
+  ),
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   operationsRoute,
@@ -209,6 +220,7 @@ const routeTree = rootRoute.addChildren([
   batchNewRoute,
   batchEditRoute,
   executionsRoute,
+  schedulesRoute,
 ])
 
 export const router = createRouter({ routeTree })
